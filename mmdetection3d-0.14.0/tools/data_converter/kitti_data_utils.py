@@ -36,6 +36,7 @@ def get_kitti_info_path(idx,
         return str(prefix / file_path)
 
 
+
 def get_image_path(idx,
                    prefix,
                    training=True,
