@@ -3,7 +3,7 @@ import os
 
 
 def filter_json(input_file, output_file, max_images=64):
-  """Filters a JSON file to keep only the specified number of images.
+  """Filters a JSON file to keep only the specified number of images and their corresponding annotations.
 
   Args:
     input_file: The path to the input JSON file.
@@ -15,10 +15,18 @@ def filter_json(input_file, output_file, max_images=64):
     data = json.load(f)
 
   # Filter the images
-  filtered_data = {
-      'images': data['images'][:max_images],
-      'categories': data['categories']
-  }
+  filtered_images = data['images'][:max_images]
+  filtered_data = {'images': filtered_images, 'categories': data['categories']}
+
+  # Filter the annotations
+  if len(data['annotations']) > 0:
+    filtered_annotations = []
+    for annotation in data['annotations']:
+      if annotation['image_id'] in [image['id'] for image in filtered_images]:
+        filtered_annotations.append(annotation)
+    filtered_data['annotations'] = filtered_annotations
+  else:
+    filtered_data['annotations'] = []
 
   # Save the filtered data to a new JSON file
   with open(output_file, 'w') as f:

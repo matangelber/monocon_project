@@ -31,7 +31,8 @@ max_images = 64
 for json_filename in ['kitti_infos_test.pkl',
                       'kitti_infos_val.pkl',
                       'kitti_infos_train.pkl',
-                      'kitti_infos_trainval.pkl']:
+                      'kitti_infos_trainval.pkl',
+                      'kitti_dbinfos_train.pkl']:
     input_file = os.path.join(input_dir, json_filename)
     output_file = os.path.join(output_dir, json_filename)
     filter_pickle(input_file, output_file, max_images)

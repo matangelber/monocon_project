@@ -11,7 +11,7 @@ from tools.train import main as mm3d_train
 
 # Adding arguments dynamically
 config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
-workdir = os.path.abspath('../outputs')
+workdir = os.path.abspath('../outputs/debug_outputs')
 sys.argv.extend([
     config_file,             # Required positional argument
     '--work-dir', workdir,    # Example optional arguments
