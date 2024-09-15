@@ -88,6 +88,34 @@ class LoadImageFromFileMono3D(LoadImageFromFile):
         results['cam_intrinsic'] = results['img_info']['cam_intrinsic']
         return results
 
+@PIPELINES.register_module()
+class LoadImagesFromFileMono3DStereo(LoadImageFromFile):
+    """Load an image from file in monocular 3D object detection. Compared to 2D
+    detection, additional camera parameters need to be loaded.
+
+    Args:
+        kwargs (dict): Arguments are the same as those in \
+            :class:`LoadImageFromFile`.
+    """
+
+    def __call__(self, results):
+        """Call functions to load image and get image meta information.
+
+        Args:
+            results (dict): Result dict from :obj:`mmdet.CustomDataset`.
+
+        Returns:
+            dict: The dict contains loaded image and meta information.
+        """
+        super().__call__(results)
+        results['left_img'] = results['img']
+        results['img_info']['filename'] = results['img_info']['filename'].replace('image_2', 'image_3')
+        super().__call__(results)
+        results['right_img'] = results['img']
+        results['img'] = np.vstack([results['left_img'], results['left_img']])
+        results['cam_intrinsic'] = results['img_info']['cam_intrinsic']
+        return results
+
 
 @PIPELINES.register_module()
 class LoadPointsFromMultiSweeps(object):
