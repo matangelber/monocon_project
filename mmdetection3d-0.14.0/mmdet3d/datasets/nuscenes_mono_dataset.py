@@ -621,10 +621,10 @@ class NuScenesMonoDataset(CocoDataset):
             data_info = self.data_infos[i]
             img_path = data_info['file_name']
             file_name = osp.split(img_path)[-1].split('.')[0]
-            img, img_metas = self._extract_data(i, pipeline,
-                                                ['img', 'img_metas'])
+            img, cam_intrinsic = self._extract_data(i, pipeline,
+                                                ['img', 'cam_intrinsic'])
             # need to transpose channel to first dim
-            img = img.numpy().transpose(1, 2, 0)
+            # img = img.numpy().transpose(1, 2, 0)
             gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
             pred_bboxes = result['boxes_3d']
             # TODO: remove the hack of box from NuScenesMonoDataset
@@ -634,7 +634,7 @@ class NuScenesMonoDataset(CocoDataset):
                 img,
                 gt_bboxes,
                 pred_bboxes,
-                img_metas['cam_intrinsic'],
+                cam_intrinsic,
                 out_dir,
                 file_name,
                 box_mode='camera',

@@ -191,19 +191,23 @@ def draw_camera_bbox3d_on_img(bboxes3d,
         thickness (int, optional): The thickness of bboxes. Default: 1.
     """
     from mmdet3d.core.bbox import points_cam2img
-
     img = raw_img.copy()
     cam_intrinsic = copy.deepcopy(cam_intrinsic)
-    corners_3d = bboxes3d.corners
-    num_bbox = corners_3d.shape[0]
-    points_3d = corners_3d.reshape(-1, 3)
     if not isinstance(cam_intrinsic, torch.Tensor):
         cam_intrinsic = torch.from_numpy(np.array(cam_intrinsic))
-    cam_intrinsic = cam_intrinsic.reshape(3, 3).float().cpu()
+    cam_intrinsic = cam_intrinsic[:3,:3].float().cpu()
+    # cam_intrinsic = cam_intrinsic.reshape(3, 3).float().cpu()
 
-    # project to 2d to get image coords (uv)
-    uv_origin = points_cam2img(points_3d, cam_intrinsic)
-    uv_origin = (uv_origin - 1).round()
-    imgfov_pts_2d = uv_origin[..., :2].reshape(num_bbox, 8, 2).numpy()
+    if len(bboxes3d) > 0:
+        corners_3d = bboxes3d.corners
+        num_bbox = corners_3d.shape[0]
+        points_3d = corners_3d.reshape(-1, 3)
+        # project to 2d to get image coords (uv)
+        uv_origin = points_cam2img(points_3d, cam_intrinsic)
+        uv_origin = (uv_origin - 1).round()
+        imgfov_pts_2d = uv_origin[..., :2].reshape(num_bbox, 8, 2).numpy()
+    else:
+        imgfov_pts_2d = None
+        num_bbox = 0
 
     return plot_rect3d_on_img(img, num_bbox, imgfov_pts_2d, color, thickness)

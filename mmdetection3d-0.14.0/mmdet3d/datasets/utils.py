@@ -132,7 +132,7 @@ def extract_result_dict(results, key):
     # results[key] may be data or list[data] or tuple[data]
     # data may be wrapped inside DataContainer
     data = results[key]
-    if isinstance(data, (list, tuple)):
+    if isinstance(data, (list, tuple)) and len(data) == 1:
         data = data[0]
     if isinstance(data, mmcv.parallel.DataContainer):
         data = data._data
