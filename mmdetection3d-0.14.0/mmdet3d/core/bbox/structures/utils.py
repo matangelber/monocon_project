@@ -172,12 +172,12 @@ def mono_cam_box2vis(cam_box):
     feats = cam_box.tensor[:, 7:]
     # rotate along x-axis for np.pi / 2
     # see also here: https://github.com/open-mmlab/mmdetection3d/blob/master/mmdet3d/datasets/nuscenes_mono_dataset.py#L557  # noqa
-    dim[:, [1, 2]] = dim[:, [2, 1]]
+    # dim[:, [1, 2]] = dim[:, [2, 1]]
     # change local yaw to global yaw for visualization
     # refer to https://github.com/open-mmlab/mmdetection3d/blob/master/mmdet3d/datasets/nuscenes_mono_dataset.py#L164-L166  # noqa
     yaw += torch.atan2(loc[:, 0], loc[:, 2])
     # convert yaw by (np.pi / 2 - yaw)
-    yaw = np.pi / 2.0 - yaw
+    # yaw = np.pi / 2 - yaw
     cam_box = torch.cat([loc, dim, yaw[:, None], feats], dim=1)
     cam_box = CameraInstance3DBoxes(
         cam_box, box_dim=cam_box.shape[-1], origin=(0.5, 0.5, 0.5))

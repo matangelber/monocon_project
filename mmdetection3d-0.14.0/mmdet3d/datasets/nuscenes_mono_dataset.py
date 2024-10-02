@@ -628,6 +628,44 @@ class NuScenesMonoDataset(CocoDataset):
             gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
             pred_bboxes = result['boxes_3d']
             # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes = mono_cam_box2vis(gt_bboxes) # local yaw -> global yaw
+            # pred_bboxes = mono_cam_box2vis(pred_bboxes)
+            show_multi_modality_result(
+                img,
+                gt_bboxes,
+                pred_bboxes,
+                cam_intrinsic,
+                out_dir,
+                file_name,
+                box_mode='camera',
+                show=show)
+
+    def show_bev(self, results, out_dir, show=True, pipeline=None):
+        """Results visualization.
+
+        Args:
+            results (list[dict]): List of bounding boxes results.
+            out_dir (str): Output directory of visualization result.
+            show (bool): Visualize the results online.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+        """
+        assert out_dir is not None, 'Expect out_dir, got none.'
+        pipeline = self._get_pipeline(pipeline)
+        for i, result in enumerate(results):
+            i = 31
+            if 'img_bbox' in result.keys():
+                result = result['img_bbox']
+            data_info = self.data_infos[i]
+            img_path = data_info['file_name']
+            file_name = osp.split(img_path)[-1].split('.')[0]
+            img, cam_intrinsic = self._extract_data(i, pipeline,
+                                                ['img', 'cam_intrinsic'])
+            # need to transpose channel to first dim
+            # img = img.numpy().transpose(1, 2, 0)
+            gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
+            pred_bboxes = result['boxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
             gt_bboxes = mono_cam_box2vis(gt_bboxes)
             pred_bboxes = mono_cam_box2vis(pred_bboxes)
             show_multi_modality_result(
@@ -639,8 +677,6 @@ class NuScenesMonoDataset(CocoDataset):
                 file_name,
                 box_mode='camera',
                 show=show)
-
-
 def output_to_nusc_box(detection):
     """Convert the output to the box class in the nuScenes.
 
