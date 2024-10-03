@@ -11,7 +11,8 @@ def parse_args():
     parser.add_argument('config', help='test config file path')
     parser.add_argument('--result', help='results file in pickle format')
     parser.add_argument(
-        '--show-dir', help='directory where visualize results will be saved')
+        '--output-dir', type=str, default="", help='directory where visualize results will be saved')
+    parser.add_argument('--show', action='store_true', help='show image')
     args = parser.parse_args()
 
     return args
@@ -33,13 +34,13 @@ def main(new_coco_json=None):
     dataset = build_dataset(cfg.data.test)
     results = mmcv.load(args.result)
 
-    if getattr(dataset, 'show', None) is not None:
+    if getattr(dataset, 'show_bev', None) is not None:
         # data loading pipeline for showing
         eval_pipeline = cfg.get('eval_pipeline', {})
         if eval_pipeline:
-            dataset.show(results, args.show_dir, pipeline=eval_pipeline)
+            dataset.show_bev(results, out_dir=args.output_dir, show=args.show, pipeline=eval_pipeline)
         else:
-            dataset.show(results, args.show_dir)  # use default pipeline
+            dataset.show_bev(results, out_dir=args.output_dir, show=args.show)  # use default pipeline
     else:
         raise NotImplementedError(
             'Show is not implemented for dataset {}!'.format(

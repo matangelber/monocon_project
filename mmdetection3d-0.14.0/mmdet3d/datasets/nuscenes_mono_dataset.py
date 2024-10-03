@@ -10,7 +10,7 @@ from os import path as osp
 
 from mmdet3d.core import bbox3d2result, box3d_multiclass_nms, xywhr2xyxyr
 from mmdet.datasets import DATASETS, CocoDataset
-from ..core import show_multi_modality_result
+from ..core import show_multi_modality_result, show_bev_multi_modality_result
 from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
 from .pipelines import Compose
 from .utils import extract_result_dict, get_loading_pipeline
@@ -603,7 +603,7 @@ class NuScenesMonoDataset(CocoDataset):
         ]
         return Compose(pipeline)
 
-    def show(self, results, out_dir, show=True, pipeline=None):
+    def show(self, results, output_dir, show=True, pipeline=None):
         """Results visualization.
 
         Args:
@@ -613,7 +613,7 @@ class NuScenesMonoDataset(CocoDataset):
             pipeline (list[dict], optional): raw data loading for showing.
                 Default: None.
         """
-        assert out_dir is not None, 'Expect out_dir, got none.'
+        assert output_dir is not None, 'Expect out_dir, got none.'
         pipeline = self._get_pipeline(pipeline)
         for i, result in enumerate(results):
             if 'img_bbox' in result.keys():
@@ -635,7 +635,7 @@ class NuScenesMonoDataset(CocoDataset):
                 gt_bboxes,
                 pred_bboxes,
                 cam_intrinsic,
-                out_dir,
+                output_dir,
                 file_name,
                 box_mode='camera',
                 show=show)
@@ -653,7 +653,7 @@ class NuScenesMonoDataset(CocoDataset):
         assert out_dir is not None, 'Expect out_dir, got none.'
         pipeline = self._get_pipeline(pipeline)
         for i, result in enumerate(results):
-            i = 31
+            # i = 31
             if 'img_bbox' in result.keys():
                 result = result['img_bbox']
             data_info = self.data_infos[i]
@@ -668,7 +668,7 @@ class NuScenesMonoDataset(CocoDataset):
             # TODO: remove the hack of box from NuScenesMonoDataset
             gt_bboxes = mono_cam_box2vis(gt_bboxes)
             # pred_bboxes = mono_cam_box2vis(pred_bboxes)
-            show_multi_modality_result(
+            show_bev_multi_modality_result(
                 img,
                 gt_bboxes,
                 pred_bboxes,

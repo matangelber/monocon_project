@@ -211,3 +211,83 @@ def draw_camera_bbox3d_on_img(bboxes3d,
         num_bbox = 0
 
     return plot_rect3d_on_img(img, num_bbox, imgfov_pts_2d, color, thickness)
+
+
+def draw_bev_box(bev, bev_img, img_metas, color=(0, 255, 0), thickness=1):
+    """
+    Draw BEV boxes on an image.
+
+    Args:
+        bev (torch.Tensor or np.ndarray): Tensor of shape (N, 5), where each row is [x_center, z_center, length, width, yaw].
+        bev_img (np.ndarray): Image of shape (height, width, 3) to draw on.
+        img_metas (dict): Metadata including scaling factors, origin positions, etc.
+        color (tuple): RGB color for the boxes.
+        thickness (int): Line thickness for the boxes.
+
+    Returns:
+        np.ndarray: Image with the BEV boxes drawn.
+    """
+    # Define the scaling factor and the origin position in pixels
+    scaling_factor = 10  # 10 cm per pixel -> 1 meter = 10 pixels
+    origin = (200, 100)  # Camera is located at (100, 0) in the image (x, y)
+
+    for box in bev:
+        # Parse box parameters
+        x_center, z_center, length, width, yaw = box
+
+        # Convert BEV coordinates to pixel coordinates
+        # Multiply by scaling factor to get pixel values
+        x_pixel = int(x_center * scaling_factor) + origin[0]
+        y_pixel = int(z_center * scaling_factor) + origin[1]
+
+        # Compute the four corners of the rectangle based on length, width, and yaw
+        corners = get_box_corners(x_pixel, y_pixel, length * scaling_factor, width * scaling_factor, yaw)
+
+        # Draw the rectangle on the bev_img using the computed corners
+        corners = np.int32(corners).reshape((-1, 1, 2))
+
+        corners[:,:,1] = bev_img.shape[0] - corners[:,:,1]# Reshape for OpenCV's `polylines` function
+        cv2.polylines(bev_img, [corners], isClosed=True, color=color, thickness=thickness)
+
+    # Mark the camera point at the origin
+    origin =  (origin[0], bev_img.shape[0] - origin[1])
+    cv2.circle(bev_img, origin, radius=5, color=(0, 0, 255), thickness=-1)
+    cv2.putText(bev_img, "Camera", (origin[0] - 20, origin[1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+
+    return bev_img
+
+def get_box_corners(x_center, y_center, length, width, yaw):
+    """
+    Calculate the corner coordinates of a rectangle given its center, dimensions, and yaw.
+
+    Args:
+        x_center (int): X-coordinate of the rectangle's center.
+        y_center (int): Y-coordinate of the rectangle's center.
+        length (float): Length of the rectangle.
+        width (float): Width of the rectangle.
+        yaw (float): Yaw angle in radians.
+
+    Returns:
+        np.ndarray: Array of shape (4, 2) with the coordinates of the rectangle's corners.
+    """
+    # Define half sizes
+    half_length = length / 2
+    half_width = width / 2
+
+    # Define the corners relative to the center without rotation
+    corners = np.array([[half_length, half_width],
+                        [half_length, -half_width],
+                        [-half_length, -half_width],
+                        [-half_length, half_width]])
+
+    # Rotation matrix for yaw angle
+    rotation_matrix = np.array([[np.cos(yaw), -np.sin(yaw)],
+                                [np.sin(yaw), np.cos(yaw)]])
+
+    # Rotate the corners around the center
+    rotated_corners = np.dot(corners, rotation_matrix)
+
+    # Translate corners to the actual center position
+    translated_corners = rotated_corners + np.array([x_center, y_center])
+
+    return translated_corners
