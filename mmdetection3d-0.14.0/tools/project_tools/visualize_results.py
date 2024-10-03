@@ -1,7 +1,6 @@
 import argparse
 import mmcv
 from mmcv import Config
-
 from mmdet3d.datasets import build_dataset
 
 
@@ -17,7 +16,7 @@ def parse_args():
     return args
 
 
-def main(new_coco_json=None):
+def main():
     args = parse_args()
 
     if args.result is not None and \
@@ -28,8 +27,6 @@ def main(new_coco_json=None):
     cfg.data.test.test_mode = True
 
     # build the dataset
-    if new_coco_json is not None:
-        cfg.data.test['ann_file'] = new_coco_json
     dataset = build_dataset(cfg.data.test)
     results = mmcv.load(args.result)
 

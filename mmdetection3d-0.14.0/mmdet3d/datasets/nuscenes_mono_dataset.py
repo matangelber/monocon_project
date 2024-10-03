@@ -667,7 +667,7 @@ class NuScenesMonoDataset(CocoDataset):
             pred_bboxes = result['boxes_3d']
             # TODO: remove the hack of box from NuScenesMonoDataset
             gt_bboxes = mono_cam_box2vis(gt_bboxes)
-            pred_bboxes = mono_cam_box2vis(pred_bboxes)
+            # pred_bboxes = mono_cam_box2vis(pred_bboxes)
             show_multi_modality_result(
                 img,
                 gt_bboxes,
