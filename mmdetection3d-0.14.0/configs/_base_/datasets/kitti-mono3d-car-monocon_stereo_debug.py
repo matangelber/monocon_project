@@ -1,5 +1,5 @@
 # dataset settings
-dataset_type = 'KittiMonoDatasetMonoCon'
+dataset_type = 'KittiMonoDatasetMonoConStereo'
 data_root = 'data/kitti/'
 data_debug_root = 'data/kitti/debug_annotations/'
 class_names = ['Car']
@@ -13,7 +13,7 @@ img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 
 train_pipeline = [
-    dict(type='LoadImagesFromFileMono3DStereo', to_float32=True, color_type='color'),
+    dict(type='LoadImageFromFileMono3D', to_float32=True, color_type='color'),
     dict(
         type='LoadAnnotations3DMonoCon',
         with_bbox=True,
