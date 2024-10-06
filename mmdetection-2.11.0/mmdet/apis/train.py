@@ -58,7 +58,6 @@ def train_detector(model,
                 'Automatically set "samples_per_gpu"="imgs_per_gpu"='
                 f'{cfg.data.imgs_per_gpu} in this experiments')
         cfg.data.samples_per_gpu = cfg.data.imgs_per_gpu
-    collate_fn = cfg.data.train.pop('collate_fn', None)
     data_loaders = [
         build_dataloader(
             ds,
@@ -67,8 +66,7 @@ def train_detector(model,
             # cfg.gpus will be ignored if distributed
             len(cfg.gpu_ids),
             dist=distributed,
-            seed=cfg.seed,
-            collate_fn=collate_fn) for ds in dataset
+            seed=cfg.seed) for ds in dataset
     ]
 
     # put model on gpus

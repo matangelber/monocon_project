@@ -15,7 +15,8 @@ from .transforms_3d import (BackgroundPointsFilter, GlobalAlignment,
                             VoxelBasedPointSampler, RandomFlipMonoCon,
                             RandomShiftMonoCon)
 from .transforms_stereo import (LoadImageFromFileMono3DStereo, LoadAnnotations3DMonoConStereo,
- PhotoMetricDistortionStereo, RandomFlipMonoConStereo, RandomShiftMonoConStereo, NormalizeStereo, PadStereo)
+ PhotoMetricDistortionStereo, RandomFlipMonoConStereo, RandomShiftMonoConStereo, NormalizeStereo, PadStereo,
+                                DefaultFormatBundle3DStereo, Collect3DStereo)
 
 __all__ = [
     'ObjectSample', 'RandomFlip3D', 'ObjectNoise', 'GlobalRotScaleTrans',
@@ -30,5 +31,5 @@ __all__ = [
     'RandomFlipMonoCon', 'RandomShiftMonoCon', 'RandomFlip', 'RandomCenterCropPad',
     'Resize', 'PhotoMetricDistortion', 'LoadImageFromFileMono3DStereo', 'LoadAnnotations3DMonoConStereo',
      'PhotoMetricDistortionStereo', 'RandomFlipMonoConStereo', 'RandomShiftMonoConStereo', 'NormalizeStereo',
-    'PadStereo'
+    'PadStereo', 'DefaultFormatBundle3DStereo', 'Collect3DStereo'
 ]
