@@ -35,6 +35,15 @@ def transform_alpha_cam2_to_cam3(alpha_cam2, P2, P3, depth):
     alpha_cam3[cond_in_range(alpha_cam3)] = (alpha_cam3 + delta_alpha)[cond_in_range(alpha_cam3)]
     return alpha_cam3
 
+def get_delta_x(P_source, P_dest):
+    # Extract the translation components from the projection matrices
+    t_source = P_source[0, 3] / P_source[0, 0]  # Translation component for camera 2
+    t_dest = P_dest[0, 3] / P_dest[0, 0]  # Translation component for camera 3
+
+    # Calculate the horizontal shift in pixels between camera 2 and camera 3
+    delta_x = t_dest - t_source
+    return delta_x
+
 
 def transform_bbox_cam2_to_cam3(bbox, P2, P3):
     """
@@ -54,7 +63,7 @@ def transform_bbox_cam2_to_cam3(bbox, P2, P3):
 
     # Calculate the horizontal shift in pixels between camera 2 and camera 3
     delta_x = t3 - t2
-
+    delta_x = get_delta_x(P2, P3)
     # Transform the bounding box from camera 2 to camera 3 by shifting the x-coordinates
     bbox_cam3 = bbox.copy()
     bbox_cam3[:, 0] += delta_x  # x_min_cam3 = x_min_cam2 + delta_x
@@ -87,7 +96,49 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         self.max_occlusion = max_occlusion
         self.anno_infos_cam3 = self._get_anno_infos_cam3()
         self.data_infos_cam3 = self._get_data_infos_cam3()
-        pass
+        self.add_cam3_to_coco_annotations()
+
+    def add_cam3_to_coco_annotations(self):
+        cond_in_set = np.vectorize(lambda x: x in ['Car', 'Pedestrian', 'Cyclist'])
+        for anno in self.anno_infos_cam3:
+            image_id = anno['image']['image_idx']
+            names = anno['annos']['name']
+            names = names[cond_in_set(names)]
+            bboxes_cam3 = anno['annos']['bbox']
+            P0 = anno['calib']['P0']
+            P2 = anno['calib']['P2']
+            P3 = anno['calib']['P3']
+            x_offset_from_cam0 = get_delta_x(P0, P3)
+            x_offset_from_cam2 = get_delta_x(P2, P3)
+            # coco_image_anno = self.coco.img_ann_map[image_id]
+            for i, coco_anno in enumerate(self.coco.img_ann_map[image_id]):
+                coco_anno['file_name_cam3'] = coco_anno['file_name'].replace('image_2', 'image_3')
+                coco_anno['bbox_cam3'] = bboxes_cam3[i]
+                coco_anno['bbox_cam3d_cam3'] = deepcopy(coco_anno['bbox_cam3d_cam0'])
+                coco_anno['bbox_cam3d_cam3'][0] += x_offset_from_cam0
+                coco_anno['center2d_cam3'] = deepcopy(coco_anno['center2d'])
+                coco_anno['center2d_cam3'][0] = x_offset_from_cam2
+                coco_anno['keypoints_cam3'] = deepcopy(coco_anno['keypoints'])
+                coco_anno['keypoints_cam3'][::3] += x_offset_from_cam2
+
+    def get_ann_info_cam3(self, idx):
+        """Get COCO annotation by index.
+
+        Args:
+            idx (int): Index of data.
+
+        Returns:
+            dict: Annotation info of specified index.
+        """
+
+        img_id = self.data_infos_cam3[idx]['id']
+        ann_ids = self.coco.get_ann_ids(img_ids=[img_id])
+        ann_info = self.coco.load_anns(ann_ids)
+        for ann in ann_info:
+            cam2_keys_to_change = [k[:-5] for k in list(ann.keys()) if k.endswith('cam3')]
+            for k in cam2_keys_to_change:
+                ann[k] = ann[k + '_cam3']
+        return self._parse_ann_info(self.data_infos_cam3[idx], ann_info)
 
     def _get_anno_infos_cam3(self):
         anno_infos = deepcopy(self.anno_infos)
@@ -108,6 +159,9 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             data_info['filename'] = data_info['filename'].replace('image_2', 'image_3')
             data_info['file_name'] = data_info['filename']
         return data_infos
+
+    def _add_cam3_to_coco_annotations(self):
+        pass
 
     def _parse_ann_info(self, img_info, ann_info):
         """Parse bbox and mask annotation.
@@ -210,7 +264,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             gt_bboxes_ignore = np.array(gt_bboxes_ignore, dtype=np.float32)
         else:
             gt_bboxes_ignore = np.zeros((0, 4), dtype=np.float32)
-
         seg_map = img_info['filename'].replace('jpg', 'png')
 
         ann = dict(
@@ -227,3 +280,47 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             seg_map=seg_map)
 
         return ann
+
+
+    def prepare_train_img(self, idx):
+        """Get training data and annotations after pipeline.
+
+        Args:
+            idx (int): Index of data.
+
+        Returns:
+            dict: Training data and annotation after pipeline with new keys \
+                introduced by pipeline.
+        """
+
+        img_info_left = self.data_infos[idx]
+        ann_info_left = self.get_ann_info(idx)
+        img_info_right = self.data_infos_cam3[idx]
+        ann_info_right = self.get_ann_info_cam3(idx)
+        results = dict(img_info=img_info_left, ann_info=ann_info_left,
+                       img_info_right=img_info_right, ann_info_right=ann_info_right)
+        if self.proposals is not None:
+            results['proposals'] = self.proposals[idx]
+        self.pre_pipeline(results)
+        return self.pipeline(results)
+
+
+    def __getitem__(self, idx):
+        """Get training/test data after pipeline.
+
+        Args:
+            idx (int): Index of data.
+
+        Returns:
+            dict: Training/test data (with annotation if `test_mode` is set \
+                True).
+        """
+
+        if self.test_mode:
+            return self.prepare_test_img(idx)
+        while True:
+            data = self.prepare_train_img(idx)
+            if data is None:
+                idx = self._rand_another(idx)
+                continue
+            return data

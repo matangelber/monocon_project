@@ -13,9 +13,9 @@ img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 
 train_pipeline = [
-    dict(type='LoadImageFromFileMono3D', to_float32=True, color_type='color'),
+    dict(type='LoadImageFromFileMono3DStereo', to_float32=True, color_type='color'),
     dict(
-        type='LoadAnnotations3DMonoCon',
+        type='LoadAnnotations3DMonoConStereo',
         with_bbox=True,
         with_2D_kpts=True,
         with_label=True,
@@ -24,19 +24,19 @@ train_pipeline = [
         with_label_3d=True,
         with_bbox_depth=True),
     dict(
-        type='PhotoMetricDistortion',
+        type='PhotoMetricDistortionStereo',
         brightness_delta=32,
         contrast_range=(0.5, 1.5),
         saturation_range=(0.5, 1.5),
         hue_delta=18),
-    dict(type='RandomShiftMonoCon', shift_ratio=0.5, max_shift_px=32),
-    dict(type='RandomFlipMonoCon', flip_ratio_bev_horizontal=0.5),
-    dict(type='Normalize', **img_norm_cfg),
-    dict(type='Pad', size_divisor=32),
+    dict(type='RandomShiftMonoConStereo', shift_ratio=0.5, max_shift_px=32),
+    dict(type='RandomFlipMonoConStereo', flip_ratio_bev_horizontal=0.5),
+    dict(type='NormalizeStereo', **img_norm_cfg),
+    dict(type='PadStereo', size_divisor=32),
     # Note: keys ['gt_kpts_2d', 'gt_kpts_valid_mask'] is hard coded in DefaultFormatBundle
-    dict(type='DefaultFormatBundle3D', class_names=class_names),
+    dict(type='DefaultFormatBundle3DStereo', class_names=class_names),
     dict(
-        type='Collect3D',
+        type='Collect3DStereo',
         keys=[
             'img', 'gt_bboxes', 'gt_labels', 'gt_bboxes_ignore', 'gt_bboxes_3d',
             'gt_labels_3d', 'centers2d', 'depths', 'gt_kpts_2d', 'gt_kpts_valid_mask',
@@ -84,7 +84,9 @@ data = dict(
         max_depth=65,
         max_truncation=0.5,
         max_occlusion=2,
-        box_type_3d='Camera'),
+        box_type_3d='Camera',
+        # collate_fn='stereo_collate_fn'
+    ),
     val=dict(
         type=dataset_type,
         data_root=data_root,
