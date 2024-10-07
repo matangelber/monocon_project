@@ -603,7 +603,7 @@ class NuScenesMonoDataset(CocoDataset):
         ]
         return Compose(pipeline)
 
-    def show(self, results, output_dir, show=True, pipeline=None):
+    def show(self, results=None, output_dir=None, show=True, pipeline=None):
         """Results visualization.
 
         Args:

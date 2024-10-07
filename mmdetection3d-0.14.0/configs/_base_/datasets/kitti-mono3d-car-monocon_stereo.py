@@ -1,7 +1,6 @@
 # dataset settings
 dataset_type = 'KittiMonoDatasetMonoConStereo'
 data_root = 'data/kitti/'
-data_debug_root = 'data/kitti/debug_annotations/'
 class_names = ['Car']
 input_modality = dict(
     use_lidar=False,
@@ -68,13 +67,13 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=8,
-    workers_per_gpu=0,
+    samples_per_gpu=4,
+    workers_per_gpu=2,
     train=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_debug_root + 'kitti_infos_train_mono3d.coco.json',
-        info_file=data_debug_root + 'kitti_infos_train.pkl',
+        ann_file=data_root + 'kitti_infos_train_mono3d.coco.json',
+        info_file=data_root + 'kitti_infos_train.pkl',
         img_prefix=data_root,
         classes=class_names,
         pipeline=train_pipeline,
@@ -89,8 +88,8 @@ data = dict(
     val=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_debug_root + 'kitti_infos_val_mono3d.coco.json',
-        info_file=data_debug_root + 'kitti_infos_val.pkl',
+        ann_file=data_root + 'kitti_infos_val_mono3d.coco.json',
+        info_file=data_root + 'kitti_infos_val.pkl',
         img_prefix=data_root,
         classes=class_names,
         pipeline=test_pipeline,
@@ -100,8 +99,8 @@ data = dict(
     test=dict(
         type=dataset_type,
         data_root=data_root,
-        ann_file=data_debug_root + 'kitti_infos_val_mono3d.coco.json',
-        info_file=data_debug_root + 'kitti_infos_val.pkl',
+        ann_file=data_root + 'kitti_infos_val_mono3d.coco.json',
+        info_file=data_root + 'kitti_infos_val.pkl',
         img_prefix=data_root,
         classes=class_names,
         pipeline=test_pipeline,

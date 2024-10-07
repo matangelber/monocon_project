@@ -1,10 +1,15 @@
 import copy
 import numpy as np
-
+import mmcv
 from copy import deepcopy
-from mmdet.datasets import DATASETS
-from ..core.bbox import Box3DMode, CameraInstance3DBoxes
+from os import path as osp
+from mmdet3d.core.visualizer.image_vis import draw_camera_bbox3d_on_img
 from .kitti_mono_dataset import KittiMonoDataset
+from mmdet.datasets import DATASETS
+from ..core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, concat_and_show_images
+from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
+from .utils import extract_result_dict, get_loading_pipeline
+
 
 EPS = 1e-12
 INF = 1e10
@@ -304,6 +309,28 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         self.pre_pipeline(results)
         return self.pipeline(results)
 
+    def prepare_test_stereo_img(self, idx):
+        """Get training data and annotations after pipeline.
+
+        Args:
+            idx (int): Index of data.
+
+        Returns:
+            dict: Training data and annotation after pipeline with new keys \
+                introduced by pipeline.
+        """
+
+        img_info_left = self.data_infos[idx]
+        ann_info_left = self.get_ann_info(idx)
+        img_info_right = self.data_infos_cam3[idx]
+        ann_info_right = self.get_ann_info_cam3(idx)
+        results = dict(img_info=img_info_left, ann_info=ann_info_left,
+                       img_info_right=img_info_right, ann_info_right=ann_info_right)
+        if self.proposals is not None:
+            results['proposals'] = self.proposals[idx]
+        self.pre_pipeline(results)
+        return self.pipeline(results)
+
 
     def __getitem__(self, idx):
         """Get training/test data after pipeline.
@@ -324,3 +351,85 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 idx = self._rand_another(idx)
                 continue
             return data
+
+
+
+    def show(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
+        """Results visualization.
+
+        Args:
+            results (list[dict]): List of bounding boxes results.
+            out_dir (str): Output directory of visualization result.
+            show (bool): Visualize the results online.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+        """
+        assert output_dir is not None, 'Expect out_dir, got none.'
+        pipeline = self._get_pipeline(pipeline)
+        for i in range(min(max_images_to_show, len(self.data_infos))):
+            data_info = self.data_infos[i]
+            img_path = data_info['file_name']
+            file_name = osp.split(img_path)[-1].split('.')[0]
+            img, cam_intrinsic = self._extract_data(i, pipeline,
+                                                ['img', 'cam_intrinsic'])
+            img_cam3, cam_intrinsic_cam3 = self._extract_data_cam3(i, pipeline,
+                                                    ['img', 'cam_intrinsic'])
+            # need to transpose channel to first dim
+            # img = img.numpy().transpose(1, 2, 0)
+            gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes = mono_cam_box2vis(gt_bboxes) # local yaw -> global yaw
+            gt_bboxes_cam3 = self.get_ann_info_cam3(i)['gt_bboxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes_cam3 = mono_cam_box2vis(gt_bboxes_cam3)  # local yaw -> global yaw
+            show_img_left = show_3d_gt(
+                img,
+                gt_bboxes,
+                cam_intrinsic,
+                output_dir,
+                file_name,
+                show=show,
+                suffix='left')
+            show_img_right = show_3d_gt(
+                img_cam3,
+                gt_bboxes_cam3,
+                cam_intrinsic_cam3,
+                output_dir,
+                file_name,
+                show=show,
+                suffix='right')
+            concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='gt_stereo')
+
+
+    def _extract_data_cam3(self, index, pipeline, key, load_annos=False):
+        """Load data using input pipeline and extract data according to key.
+
+        Args:
+            index (int): Index for accessing the target data.
+            pipeline (:obj:`Compose`): Composed data loading pipeline.
+            key (str | list[str]): One single or a list of data key.
+            load_annos (bool): Whether to load data annotations.
+                If True, need to set self.test_mode as False before loading.
+
+        Returns:
+            np.ndarray | torch.Tensor | list[np.ndarray | torch.Tensor]:
+                A single or a list of loaded data.
+        """
+        assert pipeline is not None, 'data loading pipeline is not provided'
+        img_info = self.data_infos_cam3[index]
+        input_dict = dict(img_info=img_info)
+
+        if load_annos:
+            ann_info = self.get_ann_info_cam3(index)
+            input_dict.update(dict(ann_info=ann_info))
+
+        self.pre_pipeline(input_dict)
+        example = pipeline(input_dict)
+
+        # extract data items according to keys
+        if isinstance(key, str):
+            data = extract_result_dict(example, key)
+        else:
+            data = [extract_result_dict(example, k) for k in key]
+
+        return data

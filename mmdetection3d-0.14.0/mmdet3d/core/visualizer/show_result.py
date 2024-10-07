@@ -253,7 +253,6 @@ def show_multi_modality_result(img,
             img_metas,
             color=pred_bbox_color)
 
-
     if show:
         mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
     if out_dir:
@@ -272,16 +271,16 @@ def show_multi_modality_result(img,
     #     mmcv.imwrite(pred_img, osp.join(result_path, f'{filename}_pred.png'))
 
 def show_bev_multi_modality_result(img,
-                               gt_bboxes,
-                               pred_bboxes,
-                               proj_mat,
-                               out_dir,
-                               filename,
-                               box_mode,
-                               img_metas=None,
-                               show=False,
-                               gt_bbox_color=(61, 102, 255),
-                               pred_bbox_color=(241, 101, 72)):
+                                   gt_bboxes,
+                                   pred_bboxes,
+                                   proj_mat,
+                                   out_dir,
+                                   filename,
+                                   box_mode,
+                                   img_metas=None,
+                                   show=False,
+                                   gt_bbox_color=(61, 102, 255),
+                                   pred_bbox_color=(241, 101, 72)):
     """Convert multi-modality detection results into 2D results.
 
     Project the predicted 3D bbox to 2D image plane and visualize them.
@@ -321,3 +320,54 @@ def show_bev_multi_modality_result(img,
     if out_dir:
         mmcv.imwrite(bev_image, osp.join(result_path, f'{filename}_bev_img.png'))
 
+
+def show_3d_gt(img,
+               gt_bboxes,
+               proj_mat,
+               out_dir,
+               filename,
+               img_metas=None,
+               show=False,
+               suffix="",
+               gt_bbox_color=(61, 102, 255)):
+    """Convert multi-modality detection results into 2D results.
+
+    Project the predicted 3D bbox to 2D image plane and visualize them.
+
+    Args:
+        img (np.ndarray): The numpy array of image in cv2 fashion.
+        gt_bboxes (:obj:`BaseInstance3DBoxes`): Ground truth boxes.
+        pred_bboxes (:obj:`BaseInstance3DBoxes`): Predicted boxes.
+        proj_mat (numpy.array, shape=[4, 4]): The projection matrix
+            according to the camera intrinsic parameters.
+        out_dir (str): Path of output directory.
+        filename (str): Filename of the current frame.
+        box_mode (str): Coordinate system the boxes are in.
+            Should be one of 'depth', 'lidar' and 'camera'.
+        img_metas (dict): Used in projecting depth bbox.
+        show (bool): Visualize the results online. Defaults to False.
+        gt_bbox_color (str or tuple(int)): Color of bbox lines.
+           The tuple of color should be in BGR order. Default: (255, 102, 61)
+        pred_bbox_color (str or tuple(int)): Color of bbox lines.
+           The tuple of color should be in BGR order. Default: (72, 101, 241)
+    """
+    result_path = osp.join(out_dir, filename)
+    mmcv.mkdir_or_exist(result_path)
+    show_img = img.copy()
+    if gt_bboxes is not None:
+        show_img = draw_camera_bbox3d_on_img(
+            gt_bboxes, show_img, proj_mat, img_metas, color=gt_bbox_color)
+    if show:
+        mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
+    if out_dir:
+        mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_{suffix}.png'))
+    return show_img
+
+def concat_and_show_images(img_up, img_down, out_dir, filename, show, suffix):
+    result_path = osp.join(out_dir, filename)
+    mmcv.mkdir_or_exist(result_path)
+    show_img = np.vstack([img_up, img_down])
+    if show:
+        mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
+    if out_dir:
+        mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_{suffix}.png'))
