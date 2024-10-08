@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import mmcv
+import cv2
 from copy import deepcopy
 from os import path as osp
 from mmdet3d.core.visualizer.image_vis import draw_camera_bbox3d_on_img
@@ -309,29 +310,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         self.pre_pipeline(results)
         return self.pipeline(results)
 
-    def prepare_test_stereo_img(self, idx):
-        """Get training data and annotations after pipeline.
-
-        Args:
-            idx (int): Index of data.
-
-        Returns:
-            dict: Training data and annotation after pipeline with new keys \
-                introduced by pipeline.
-        """
-
-        img_info_left = self.data_infos[idx]
-        ann_info_left = self.get_ann_info(idx)
-        img_info_right = self.data_infos_cam3[idx]
-        ann_info_right = self.get_ann_info_cam3(idx)
-        results = dict(img_info=img_info_left, ann_info=ann_info_left,
-                       img_info_right=img_info_right, ann_info_right=ann_info_right)
-        if self.proposals is not None:
-            results['proposals'] = self.proposals[idx]
-        self.pre_pipeline(results)
-        return self.pipeline(results)
-
-
     def __getitem__(self, idx):
         """Get training/test data after pipeline.
 
@@ -342,7 +320,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             dict: Training/test data (with annotation if `test_mode` is set \
                 True).
         """
-
         if self.test_mode:
             return self.prepare_test_img(idx)
         while True:
@@ -351,7 +328,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 idx = self._rand_another(idx)
                 continue
             return data
-
 
 
     def show(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
@@ -400,6 +376,41 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 suffix='right')
             concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='gt_stereo')
 
+    def show_pipline_transform(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
+        """Results visualization.
+
+        Args:
+            results (list[dict]): List of bounding boxes results.
+            out_dir (str): Output directory of visualization result.
+            show (bool): Visualize the results online.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+        """
+        assert output_dir is not None, 'Expect out_dir, got none.'
+        self.pipeline = self._get_pipeline_for_visualization(pipeline)
+        for i in range(min(max_images_to_show, len(self.data_infos))):
+            data_info = self.data_infos[i]
+            img_path = data_info['file_name']
+            file_name = osp.split(img_path)[-1].split('.')[0]
+            results = self.prepare_train_img(i)
+            for t_i, (t, res) in enumerate(results.items()):
+                if 'Bundle' in t:
+                    break
+                suffix = str(t_i + 1) + '_' + t
+
+                show_img_left = res['results_cam2']['img']
+                show_img_right = res['results_cam3']['img']
+
+                show_img_left = self.normalize_to_uint8(show_img_left)
+                show_img_right = self.normalize_to_uint8(show_img_right)
+
+                show_img_left = self.add_text_to_image(show_img_left, f'Left - {str(t_i + 1)}: {t}')
+                show_img_right = self.add_text_to_image(show_img_right,f'Right - {str(t_i + 1)}: {t}')
+
+
+                concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix=suffix)
+
+
 
     def _extract_data_cam3(self, index, pipeline, key, load_annos=False):
         """Load data using input pipeline and extract data according to key.
@@ -433,3 +444,21 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             data = [extract_result_dict(example, k) for k in key]
 
         return data
+
+    def add_text_to_image(self, image, text):
+        # Define the text, position, font, scale, color, and thickness
+        position = (10, 20)  # (x, y) coordinates for the text
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.6
+        color = (0, 255, 0)  # Red color in BGR format
+        thickness = 1
+        # Add text to the image
+        cv2.putText(image, text, position, font, font_scale, color, thickness, lineType=cv2.LINE_AA)
+        return image
+
+    def normalize_to_uint8(self, image):
+        image = image - image.min()
+        image = (255 * image / image.max()).astype(np.uint8)
+        image =  np.ascontiguousarray(image)
+        return image
+

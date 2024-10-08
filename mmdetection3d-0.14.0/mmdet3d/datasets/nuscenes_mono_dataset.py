@@ -12,7 +12,7 @@ from mmdet3d.core import bbox3d2result, box3d_multiclass_nms, xywhr2xyxyr
 from mmdet.datasets import DATASETS, CocoDataset
 from ..core import show_multi_modality_result, show_bev_multi_modality_result
 from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
-from .pipelines import Compose
+from .pipelines import Compose, ComposeForVisualization
 from .utils import extract_result_dict, get_loading_pipeline
 
 
@@ -590,6 +590,23 @@ class NuScenesMonoDataset(CocoDataset):
             loading_pipeline = get_loading_pipeline(self.pipeline.transforms)
             return Compose(loading_pipeline)
         return Compose(pipeline)
+
+    def _get_pipeline_for_visualization(self, pipeline):
+        """Get data loading pipeline in self.show/evaluate function.
+
+        Args:
+            pipeline (list[dict] | None): Input pipeline. If None is given, \
+                get from self.pipeline.
+        """
+        if pipeline is None:
+            if not hasattr(self, 'pipeline') or self.pipeline is None:
+                warnings.warn(
+                    'Use default pipeline for data loading, this may cause '
+                    'errors when data is on ceph')
+                return self._build_default_pipeline()
+            loading_pipeline = get_loading_pipeline(self.pipeline.transforms)
+            return ComposeForVisualization(loading_pipeline)
+        return ComposeForVisualization(pipeline)
 
     def _build_default_pipeline(self):
         """Build the default pipeline for this dataset."""

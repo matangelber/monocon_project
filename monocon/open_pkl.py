@@ -1,7 +1,7 @@
 import pickle
 
 # Specify the path to your pickle file
-pickle_file_path = '/home/matan/Projects/MonoCon/outputs/pretrained_results/output.pkl'  # Replace with your actual file path
+pickle_file_path = '/outputs/inference_runs/pretrained_results/output.pkl'  # Replace with your actual file path
 
 # Open the pickle file in binary read mode ('rb')
 with open(pickle_file_path, 'rb') as file:

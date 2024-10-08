@@ -188,6 +188,7 @@ class RandomFlipMonoConStereo(RandomFlipMonoCon):
         # Apply the flip transformation to results_cam3 using the same parameters
         if results_cam3['pcd_horizontal_flip']:
             self.random_flip_data_3d(results_cam3, 'horizontal')
+            results_cam3['img'] = mmcv.imflip(results_cam3['img'], direction='horizontal')
             results_cam3['transformation_3d_flow'] = results_cam2.get('transformation_3d_flow', []).copy()
 
         # Update the main results dict

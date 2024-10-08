@@ -11,7 +11,7 @@ from tools.test import main as mm3d_test
 # Adding arguments dynamically
 config_file = os.path.abspath('./configs/monocon/monocon_dla34_inference_200e_kitti_car_debug.py')
 checkpoint_path = os.path.abspath('../monocon/checkpoints/monocon4_200.pth')
-workdir = os.path.abspath('../outputs/pretrained_results/')
+workdir = os.path.abspath('../outputs/inference_runs/pretrained_results/')
 if not os.path.exists(workdir):
     os.mkdir(workdir)
 # Construct the list of arguments you want to add to sys.argv

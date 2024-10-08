@@ -31,7 +31,7 @@ def visualize_results_wrapper(config_file, results, output_dir="", show=False, f
 
 if __name__ == '__main__':
     config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
-    results = os.path.abspath('../outputs/pretrained_results/output.pkl')
+    results = os.path.abspath('../outputs/inference_runs/pretrained_results/output.pkl')
     output_dir = os.path.abspath('../outputs/debug_outputs/')
     show=False
     filtered_file_names = ['training/image_2/000063.png']

@@ -1,4 +1,5 @@
-from mmdet.datasets.pipelines import Compose, RandomCenterCropPad, PhotoMetricDistortion, Resize, RandomFlip
+from mmdet.datasets.pipelines import Compose, RandomCenterCropPad, PhotoMetricDistortion, Resize, RandomFlip, \
+    ComposeForVisualization
 from .dbsampler import DataBaseSampler
 from .formating import Collect3D, DefaultFormatBundle, DefaultFormatBundle3D
 from .loading import (LoadAnnotations3D, LoadImageFromFileMono3D,
@@ -15,7 +16,8 @@ from .transforms_3d import (BackgroundPointsFilter, GlobalAlignment,
                             VoxelBasedPointSampler, RandomFlipMonoCon,
                             RandomShiftMonoCon)
 from .transforms_stereo import (LoadImageFromFileMono3DStereo, LoadAnnotations3DMonoConStereo,
- PhotoMetricDistortionStereo, RandomFlipMonoConStereo, RandomShiftMonoConStereo, NormalizeStereo, PadStereo,
+                                PhotoMetricDistortionStereo, RandomFlipMonoConStereo, RandomShiftMonoConStereo,
+                                NormalizeStereo, PadStereo,
                                 DefaultFormatBundle3DStereo, Collect3DStereo)
 
 __all__ = [
@@ -30,6 +32,6 @@ __all__ = [
     'RandomDropPointsColor', 'RandomJitterPoints', 'LoadAnnotations3DMonoCon',
     'RandomFlipMonoCon', 'RandomShiftMonoCon', 'RandomFlip', 'RandomCenterCropPad',
     'Resize', 'PhotoMetricDistortion', 'LoadImageFromFileMono3DStereo', 'LoadAnnotations3DMonoConStereo',
-     'PhotoMetricDistortionStereo', 'RandomFlipMonoConStereo', 'RandomShiftMonoConStereo', 'NormalizeStereo',
-    'PadStereo', 'DefaultFormatBundle3DStereo', 'Collect3DStereo'
+    'PhotoMetricDistortionStereo', 'RandomFlipMonoConStereo', 'RandomShiftMonoConStereo', 'NormalizeStereo',
+    'PadStereo', 'DefaultFormatBundle3DStereo', 'Collect3DStereo', 'ComposeForVisualization'
 ]

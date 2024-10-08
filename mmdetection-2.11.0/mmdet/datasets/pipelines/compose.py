@@ -1,7 +1,7 @@
 import collections
 
 from mmcv.utils import build_from_cfg
-
+from copy import deepcopy
 from ..builder import PIPELINES
 
 
@@ -49,3 +49,15 @@ class Compose(object):
             format_string += f'    {t}'
         format_string += '\n)'
         return format_string
+
+
+@PIPELINES.register_module()
+class ComposeForVisualization(Compose):
+    def __call__(self,data):
+        data_pipline = {}
+        for t in self.transforms:
+            data = t(data)
+            data_pipline[t.__class__.__name__] = deepcopy(data)
+            if data is None:
+                return None
+        return data_pipline
