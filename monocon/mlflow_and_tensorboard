@@ -1,0 +1,14 @@
+for mmflow:
+    make sure some port (e.g. 5000) is forwarded to local server
+    then run mlflow ui (default port is 5000):
+        mlflow ui --backend-store-uri file:/path/to/mlruns
+       or
+        mlflow server --host 127.0.0.1 --port 8008 --backend-store-uri file:/path/to/mlruns
+
+for tensorboard:
+    make sure some port (e.g. 6006) is forwarded to local server
+    then run:
+    tensorboard --logdir=/main/directory --port 6006
+
+
+

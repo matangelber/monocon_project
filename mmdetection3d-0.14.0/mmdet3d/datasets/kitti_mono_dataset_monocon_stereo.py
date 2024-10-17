@@ -7,9 +7,10 @@ from os import path as osp
 from mmdet3d.core.visualizer.image_vis import draw_camera_bbox3d_on_img
 from .kitti_mono_dataset import KittiMonoDataset
 from mmdet.datasets import DATASETS
-from ..core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, concat_and_show_images
+from ..core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, concat_and_show_images, draw_keypoints
 from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
 from .utils import extract_result_dict, get_loading_pipeline
+from create_data_tools_monocon.data_converter.kitti_converter import get_2d_boxes
 
 
 EPS = 1e-12
@@ -41,7 +42,16 @@ def transform_alpha_cam2_to_cam3(alpha_cam2, P2, P3, depth):
     alpha_cam3[cond_in_range(alpha_cam3)] = (alpha_cam3 + delta_alpha)[cond_in_range(alpha_cam3)]
     return alpha_cam3
 
-def get_delta_x(P_source, P_dest):
+def get_delta_x_pixels(P_source, P_dest, depth):
+    # Extract the translation components from the projection matrices
+    t_source = P_source[0, 3]
+    t_dest = P_dest[0, 3]
+
+    # Calculate the horizontal shift in pixels between camera 2 and camera 3
+    delta_x = (t_dest - t_source) / depth
+    return delta_x
+
+def get_delta_x_meters(P_source, P_dest):
     # Extract the translation components from the projection matrices
     t_source = P_source[0, 3] / P_source[0, 0]  # Translation component for camera 2
     t_dest = P_dest[0, 3] / P_dest[0, 0]  # Translation component for camera 3
@@ -63,13 +73,8 @@ def transform_bbox_cam2_to_cam3(bbox, P2, P3):
     Returns:
     - bbox_cam3: Transformed bounding box in camera 3 [x_min_cam3, y_min, x_max_cam3, y_max]
     """
-    # Extract the translation components from the projection matrices
-    t2 = P2[0, 3] / P2[0, 0]  # Translation component for camera 2
-    t3 = P3[0, 3] / P3[0, 0]  # Translation component for camera 3
-
     # Calculate the horizontal shift in pixels between camera 2 and camera 3
-    delta_x = t3 - t2
-    delta_x = get_delta_x(P2, P3)
+    delta_x = get_delta_x_meters(P2, P3)
     # Transform the bounding box from camera 2 to camera 3 by shifting the x-coordinates
     bbox_cam3 = bbox.copy()
     bbox_cam3[:, 0] += delta_x  # x_min_cam3 = x_min_cam2 + delta_x
@@ -105,27 +110,49 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         self.add_cam3_to_coco_annotations()
 
     def add_cam3_to_coco_annotations(self):
+        def bboxes_3d_to_img_pixels(bbox_3d):
+            bbox_3d = CameraInstance3DBoxes(
+                np.array(bbox_3d).reshape(1, -1),
+                box_dim=np.array(bbox_3d).shape[-1],
+                origin=(0.5, 0.5, 0.5))
+
+
         cond_in_set = np.vectorize(lambda x: x in ['Car', 'Pedestrian', 'Cyclist'])
         for anno in self.anno_infos_cam3:
+            anno_coco_cam3 = [a for a in get_2d_boxes(anno, anno['annos']['occluded'], mono3d=True, proj_matrix='P3') if
+                              a is not None]
+            annos = anno['annos']
+            names = annos['name']
+            for k, v in annos.items():
+                annos[k] = v[cond_in_set(names)]
             image_id = anno['image']['image_idx']
-            names = anno['annos']['name']
+            names = annos['name']
             names = names[cond_in_set(names)]
-            bboxes_cam3 = anno['annos']['bbox']
+            bboxes_cam3 = annos['bbox']
+            wh = bboxes_cam3[:, 2:] - bboxes_cam3[:, :2]
+            bboxes_cam3[:, 2:] = wh # in coco indices 3,4 are w, h instead of x2, y2 like in KITTI
             P0 = anno['calib']['P0']
             P2 = anno['calib']['P2']
             P3 = anno['calib']['P3']
-            x_offset_from_cam0 = get_delta_x(P0, P3)
-            x_offset_from_cam2 = get_delta_x(P2, P3)
+            x_offset_from_cam0 = get_delta_x_meters(P0, P3)
+            x_offset_from_cam2 = get_delta_x_meters(P2, P3)
             # coco_image_anno = self.coco.img_ann_map[image_id]
             for i, coco_anno in enumerate(self.coco.img_ann_map[image_id]):
                 coco_anno['file_name_cam3'] = coco_anno['file_name'].replace('image_2', 'image_3')
-                coco_anno['bbox_cam3'] = bboxes_cam3[i]
-                coco_anno['bbox_cam3d_cam3'] = deepcopy(coco_anno['bbox_cam3d_cam0'])
-                coco_anno['bbox_cam3d_cam3'][0] += x_offset_from_cam0
-                coco_anno['center2d_cam3'] = deepcopy(coco_anno['center2d'])
-                coco_anno['center2d_cam3'][0] = x_offset_from_cam2
-                coco_anno['keypoints_cam3'] = deepcopy(coco_anno['keypoints'])
-                coco_anno['keypoints_cam3'][::3] += x_offset_from_cam2
+                coco_anno['bbox_cam3'] = anno_coco_cam3[i]['bbox']
+                coco_anno['bbox_cam3d_cam3'] = anno_coco_cam3[i]['bbox_cam3d']
+                coco_anno['center2d_cam3'] = anno_coco_cam3[i]['center2d']
+                coco_anno['keypoints_cam3'] = anno_coco_cam3[i]['keypoints']
+                #
+                # coco_anno['file_name_cam3'] = coco_anno['file_name'].replace('image_2', 'image_3')
+                # coco_anno['bbox_cam3'] = bboxes_cam3[i]
+                # coco_anno['bbox_cam3d_cam3'] = deepcopy(coco_anno['bbox_cam3d_cam0'])
+                # coco_anno['bbox_cam3d_cam3'][0] += x_offset_from_cam0
+                # coco_anno['center2d_cam3'] = deepcopy(coco_anno['center2d'])
+                # coco_anno['center2d_cam3'][0] = x_offset_from_cam2
+                # coco_anno['keypoints_cam3'] = deepcopy(coco_anno['keypoints'])
+                # coco_anno['keypoints_cam3'][::3] += x_offset_from_cam2
+        return
 
     def get_ann_info_cam3(self, idx):
         """Get COCO annotation by index.
@@ -375,6 +402,77 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 show=show,
                 suffix='right')
             concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='gt_stereo')
+
+
+
+    def show_keypoints(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
+        """Results visualization.
+
+        Args:
+            results (list[dict]): List of bounding boxes results.
+            out_dir (str): Output directory of visualization result.
+            show (bool): Visualize the results online.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+        """
+        assert output_dir is not None, 'Expect out_dir, got none.'
+        pipeline = self._get_pipeline(pipeline)
+        for i in range(min(max_images_to_show, len(self.data_infos))):
+            data_info = self.data_infos[i]
+            img_path = data_info['file_name']
+            file_name = osp.split(img_path)[-1].split('.')[0]
+            img, cam_intrinsic = self._extract_data(i, pipeline,
+                                                ['img', 'cam_intrinsic'])
+            img_cam3, cam_intrinsic_cam3 = self._extract_data_cam3(i, pipeline,
+                                                    ['img', 'cam_intrinsic'])
+            # need to transpose channel to first dim
+            # img = img.numpy().transpose(1, 2, 0)
+            anno_info = self.get_ann_info(i)
+            gt_bboxes = anno_info['gt_bboxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes = mono_cam_box2vis(gt_bboxes) # local yaw -> global yaw
+            gt_kpts_2d = anno_info['gt_kpts_2d']
+            anno_info_cam3 = self.get_ann_info_cam3(i)
+            gt_bboxes_cam3 = anno_info_cam3['gt_bboxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes_cam3 = mono_cam_box2vis(gt_bboxes_cam3)  # local yaw -> global yaw
+            gt_kpts_2d_cam3 = anno_info_cam3['gt_kpts_2d']
+            show_img_left = show_3d_gt(
+                img=img,
+                gt_bboxes=gt_bboxes,
+                proj_mat=cam_intrinsic,
+                out_dir=None,
+                filename=file_name,
+                img_metas=None,
+                show=False
+            )
+            show_img_right = show_3d_gt(
+                img=img_cam3,
+                gt_bboxes=gt_bboxes_cam3,
+                proj_mat=cam_intrinsic_cam3,
+                out_dir=None,
+                filename=file_name,
+                img_metas=None,
+                show=False
+            )
+
+            show_img_left = draw_keypoints(
+                show_img_left,
+                gt_kpts_2d,
+                output_dir,
+                file_name,
+                show=show,
+                suffix='left')
+
+            show_img_right = draw_keypoints(
+                show_img_right,
+                gt_kpts_2d_cam3,
+                output_dir,
+                file_name,
+                show=show,
+                suffix='right')
+            concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='keypoints_stereo')
+
 
     def show_pipline_transform(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
         """Results visualization.

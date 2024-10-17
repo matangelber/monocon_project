@@ -172,6 +172,39 @@ def draw_depth_bbox3d_on_img(bboxes3d,
     return plot_rect3d_on_img(img, num_bbox, imgfov_pts_2d, color, thickness)
 
 
+
+def convert_bbox_corners_to_img(bboxes3d,
+                                cam_intrinsic
+                                ):
+    """Project the 3D bbox on 2D plane and draw on input image.
+
+    Args:
+        bboxes3d (:obj:`CameraInstance3DBoxes`, shape=[M, 7]):
+            3d bbox in camera coordinate system to visualize.
+        cam_intrinsic (dict): Camera intrinsic matrix,
+            denoted as `K` in depth bbox coordinate system.
+    """
+    from mmdet3d.core.bbox import points_cam2img
+    cam_intrinsic = copy.deepcopy(cam_intrinsic)
+    if not isinstance(cam_intrinsic, torch.Tensor):
+        cam_intrinsic = torch.from_numpy(np.array(cam_intrinsic))
+    cam_intrinsic = cam_intrinsic[:3,:3].float().cpu()
+    # cam_intrinsic = cam_intrinsic.reshape(3, 3).float().cpu()
+
+    if len(bboxes3d) > 0:
+        corners_3d = bboxes3d.corners
+        num_bbox = corners_3d.shape[0]
+        points_3d = corners_3d.reshape(-1, 3)
+        # project to 2d to get image coords (uv)
+        uv_origin = points_cam2img(points_3d, cam_intrinsic)
+        uv_origin = (uv_origin - 1).round()
+        imgfov_pts_2d = uv_origin[..., :2].reshape(num_bbox, 8, 2).numpy()
+    else:
+        imgfov_pts_2d = None
+        num_bbox = 0
+    return imgfov_pts_2d
+
+
 def draw_camera_bbox3d_on_img(bboxes3d,
                               raw_img,
                               cam_intrinsic,
@@ -212,6 +245,17 @@ def draw_camera_bbox3d_on_img(bboxes3d,
 
     return plot_rect3d_on_img(img, num_bbox, imgfov_pts_2d, color, thickness)
 
+def draw_keypoints_on_img(img,
+               keypoints,
+               color=(61, 102, 0)):
+    colors = [(0,255,0), (255,0,0), (0,0,255), (0,255,255)]
+    for kpts in keypoints:
+        for i, k in enumerate(kpts.reshape(-1, 2)):
+            cv2.circle(img, tuple(k), radius=4, color=colors[i//4], thickness=-1)
+            cv2.putText(img, str(i+1), (int(k[0]) - 10, int(k[1]) + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 200, 0),
+                        1)
+
+    return img
 
 def draw_bev_box(bev, bev_img, img_metas, color=(0, 255, 0), thickness=1):
     """

@@ -4,7 +4,7 @@ import trimesh
 from os import path as osp
 
 from .image_vis import (draw_camera_bbox3d_on_img, draw_depth_bbox3d_on_img,
-                        draw_lidar_bbox3d_on_img, draw_bev_box)
+                        draw_lidar_bbox3d_on_img, draw_bev_box, draw_keypoints_on_img)
 
 
 def _write_obj(points, out_filename):
@@ -237,10 +237,6 @@ def show_multi_modality_result(img,
         draw_bbox = draw_camera_bbox3d_on_img
     else:
         raise NotImplementedError(f'unsupported box mode {box_mode}')
-
-    result_path = osp.join(out_dir, filename)
-    mmcv.mkdir_or_exist(result_path)
-
     show_img = img.copy()
     if gt_bboxes is not None:
         show_img = draw_bbox(
@@ -256,6 +252,8 @@ def show_multi_modality_result(img,
     if show:
         mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
     if out_dir:
+        result_path = osp.join(out_dir, filename)
+        mmcv.mkdir_or_exist(result_path)
         mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_and_pred.png'))
     # # if img is not None:
     # #     mmcv.imwrite(img, osp.join(result_path, f'{filename}_img.png'))
@@ -303,8 +301,6 @@ def show_bev_multi_modality_result(img,
            The tuple of color should be in BGR order. Default: (72, 101, 241)
     """
 
-    result_path = osp.join(out_dir, filename)
-    mmcv.mkdir_or_exist(result_path)
     bev_image = np.zeros((800, 400, 3), dtype=np.uint8)
     if gt_bboxes is not None:
         bev_image = draw_bev_box(
@@ -318,6 +314,8 @@ def show_bev_multi_modality_result(img,
     if show:
         mmcv.imshow(bev_image, win_name=f'{filename} - bev_img', wait_time=0)
     if out_dir:
+        result_path = osp.join(out_dir, filename)
+        mmcv.mkdir_or_exist(result_path)
         mmcv.imwrite(bev_image, osp.join(result_path, f'{filename}_bev_img.png'))
 
 
@@ -351,8 +349,6 @@ def show_3d_gt(img,
         pred_bbox_color (str or tuple(int)): Color of bbox lines.
            The tuple of color should be in BGR order. Default: (72, 101, 241)
     """
-    result_path = osp.join(out_dir, filename)
-    mmcv.mkdir_or_exist(result_path)
     show_img = img.copy()
     if gt_bboxes is not None:
         show_img = draw_camera_bbox3d_on_img(
@@ -360,14 +356,56 @@ def show_3d_gt(img,
     if show:
         mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
     if out_dir:
+        result_path = osp.join(out_dir, filename)
+        mmcv.mkdir_or_exist(result_path)
         mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_{suffix}.png'))
     return show_img
 
+def draw_keypoints(img,
+               keypoints,
+               out_dir,
+               filename,
+               show=False,
+               suffix="",
+               gt_keypoints_color=(61, 102, 0)):
+    """Convert multi-modality detection results into 2D results.
+
+    Project the predicted 3D bbox to 2D image plane and visualize them.
+
+    Args:
+        img (np.ndarray): The numpy array of image in cv2 fashion.
+        gt_bboxes (:obj:`BaseInstance3DBoxes`): Ground truth boxes.
+        pred_bboxes (:obj:`BaseInstance3DBoxes`): Predicted boxes.
+        proj_mat (numpy.array, shape=[4, 4]): The projection matrix
+            according to the camera intrinsic parameters.
+        out_dir (str): Path of output directory.
+        filename (str): Filename of the current frame.
+        box_mode (str): Coordinate system the boxes are in.
+            Should be one of 'depth', 'lidar' and 'camera'.
+        img_metas (dict): Used in projecting depth bbox.
+        show (bool): Visualize the results online. Defaults to False.
+        gt_bbox_color (str or tuple(int)): Color of bbox lines.
+           The tuple of color should be in BGR order. Default: (255, 102, 61)
+        pred_bbox_color (str or tuple(int)): Color of bbox lines.
+           The tuple of color should be in BGR order. Default: (72, 101, 241)
+    """
+    show_img = img.copy()
+    if keypoints is not None:
+        show_img = draw_keypoints_on_img(
+            show_img, keypoints, color=gt_keypoints_color)
+    if show:
+        mmcv.imshow(show_img, win_name=f'{filename} - keypoints_of_img', wait_time=0)
+    if out_dir:
+        result_path = osp.join(out_dir, filename)
+        mmcv.mkdir_or_exist(result_path)
+        mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_keypoints_gt_{suffix}.png'))
+    return show_img
+
 def concat_and_show_images(img_up, img_down, out_dir, filename, show, suffix):
-    result_path = osp.join(out_dir, filename)
-    mmcv.mkdir_or_exist(result_path)
     show_img = np.vstack([img_up, img_down])
     if show:
         mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
     if out_dir:
+        result_path = osp.join(out_dir, filename)
+        mmcv.mkdir_or_exist(result_path)
         mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_{suffix}.png'))

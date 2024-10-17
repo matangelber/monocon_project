@@ -101,7 +101,7 @@ def build_dataloader(dataset,
     Returns:
         DataLoader: A PyTorch dataloader.
     """
-    adjusted_samples_per_gpu = samples_per_gpu * 2 if type(
+    adjusted_samples_per_gpu = samples_per_gpu * 1 if type(
         dataset).__name__ == 'KittiMonoDatasetMonoConStereo' else samples_per_gpu
     rank, world_size = get_dist_info()
     if dist:

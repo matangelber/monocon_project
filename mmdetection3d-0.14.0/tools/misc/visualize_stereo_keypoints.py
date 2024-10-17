@@ -40,11 +40,11 @@ def main(new_coco_json=None):
     if getattr(dataset, 'show', None) is not None:
         eval_pipeline = cfg.get('eval_pipeline', {})
         if eval_pipeline:
-            dataset.show(max_images_to_show=args.max_images, output_dir=args.output_dir, show=args.show,
+            dataset.show_keypoints(max_images_to_show=args.max_images, output_dir=args.output_dir, show=args.show,
                          pipeline=eval_pipeline)
 
         else:
-            dataset.show(max_images_to_show=args.max_images, output_dir=args.output_dir,
+            dataset.show_keypoints(max_images_to_show=args.max_images, output_dir=args.output_dir,
                          show=args.show)  # use default pipeline
     else:
         raise NotImplementedError(
