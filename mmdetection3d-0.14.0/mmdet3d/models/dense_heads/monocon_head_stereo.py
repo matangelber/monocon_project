@@ -216,6 +216,36 @@ class MonoConHeadStereo(nn.Module):
 
         # select desired preds and labels based on mask
 
+
+        #### FOR DEBUG: ###########################################################
+        from mmdet3d.core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, concat_and_show_images, draw_keypoints
+
+        def normalize_to_uint8(image):
+            image = image - image.min()
+            image = (255 * image / image.max()).astype(np.uint8)
+            image = np.ascontiguousarray(image)
+            return image
+
+        def to_np(t):
+            return t.clone().detach().cpu().numpy()
+        a_wh = to_np(wh_target)
+        a_dim = to_np(dim_target)
+        a_offset = to_np(offset_target)
+        a_depth = to_np(depth_target)
+        a_kpt_heatmap = to_np(kpt_heatmap_offset_target)
+        a_center_heatmap = to_np(center_heatmap_target)
+        a_mask = to_np(mask_target)
+        concat_and_show_images(a_kpt_heatmap[0], a_kpt_heatmap[1],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss", filename='kpt_heatmap')
+        concat_and_show_images(255 * a_center_heatmap[2][0], 255 * a_center_heatmap[3][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss", filename='center_heatmap',
+                               show=False, suffix="")
+        concat_and_show_images(255 * (a_center_heatmap[0][0] - a_center_heatmap[1][0]),
+                               255 * (a_center_heatmap[2][0] - a_center_heatmap[3][0]),
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='center_heatmap_diff', show=False, suffix="")
+
+        ###########################################################################
         # 2d offset ToDo: project to correct camoffset_pred_stereo = self.extract_stereo_input_from_tensor(offset_pred, indices, mask_target)
         offset_pred_stereo = self.extract_stereo_input_from_tensor(offset_pred, indices, mask_target)
         offset_pred = self.extract_input_from_tensor(offset_pred, indices, mask_target)
@@ -244,6 +274,7 @@ class MonoConHeadStereo(nn.Module):
         alpha_offset_pred = torch.sum(alpha_offset_pred * alpha_cls_onehot_target, 1, keepdim=True)
         alpha_offset_target = self.extract_target_from_tensor(alpha_offset_target, mask_target)
         # center2kpt offset
+        center2kpt_offset_pred_stereo = self.extract_stereo_input_from_tensor(center2kpt_offset_pred, indices, mask_target)
         center2kpt_offset_pred = self.extract_input_from_tensor(center2kpt_offset_pred,
                                                                 indices, mask_target)  # B * (num_kpt * 2)
         center2kpt_offset_target = self.extract_target_from_tensor(center2kpt_offset_target, mask_target)
@@ -254,6 +285,8 @@ class MonoConHeadStereo(nn.Module):
         kpt_heatmap_offset_pred = kpt_heatmap_offset_pred[mask_target]
         kpt_heatmap_offset_target = kpt_heatmap_offset_target[mask_target]
         mask_kpt_heatmap_offset = self.extract_target_from_tensor(mask_kpt_heatmap_offset, mask_target)
+
+
 
         # calculate loss
         loss_center_heatmap = self.loss_center_heatmap(center_heatmap_pred, center_heatmap_target)

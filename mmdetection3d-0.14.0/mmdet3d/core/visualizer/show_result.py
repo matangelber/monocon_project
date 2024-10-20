@@ -1,3 +1,4 @@
+import cv2
 import mmcv
 import numpy as np
 import trimesh
@@ -361,6 +362,42 @@ def show_3d_gt(img,
         mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_{suffix}.png'))
     return show_img
 
+def show_2d_gt(img,
+               gt_bboxes,
+               out_dir,
+               filename,
+               show=False,
+               suffix="",
+               gt_bbox_color=(240, 32, 160)):
+    """Convert multi-modality detection results into 2D results.
+
+    Project the predicted 3D bbox to 2D image plane and visualize them.
+
+    Args:
+        img (np.ndarray): The numpy array of image in cv2 fashion.
+        gt_bboxes (:obj:`BaseInstance3DBoxes`): Ground truth boxes.
+        pred_bboxes (:obj:`BaseInstance3DBoxes`): Predicted boxes.
+        proj_mat (numpy.array, shape=[4, 4]): The projection matrix
+            according to the camera intrinsic parameters.
+        out_dir (str): Path of output directory.
+        filename (str): Filename of the current frame.
+        img_metas (dict): Used in projecting depth bbox.
+        show (bool): Visualize the results online. Defaults to False.
+        gt_bbox_color (str or tuple(int)): Color of bbox lines.
+           The tuple of color should be in BGR order. Default: (255, 102, 61)
+    """
+    show_img = img.copy()
+    if gt_bboxes is not None:
+        for gt_bbox in gt_bboxes:
+            show_img = cv2.rectangle(show_img, tuple([gt_bbox[0], gt_bbox[1]]), tuple([gt_bbox[2], gt_bbox[3]]), gt_bbox_color, thickness=1)
+    if show:
+        mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
+    if out_dir:
+        result_path = osp.join(out_dir, filename)
+        mmcv.mkdir_or_exist(result_path)
+        mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_{suffix}.png'))
+    return show_img
+
 def draw_keypoints(img,
                keypoints,
                out_dir,
@@ -401,7 +438,9 @@ def draw_keypoints(img,
         mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_keypoints_gt_{suffix}.png'))
     return show_img
 
-def concat_and_show_images(img_up, img_down, out_dir, filename, show, suffix):
+
+
+def concat_and_show_images(img_up, img_down, out_dir, filename, show=False, suffix=""):
     show_img = np.vstack([img_up, img_down])
     if show:
         mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)

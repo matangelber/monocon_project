@@ -38,7 +38,7 @@ if __name__ == '__main__':
     config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo.py')
     output_dir = os.path.abspath('../outputs/visualizations/stereo_annotations_view_train')
     show=False
-    filtered_file_names = ['training/image_2/000038.png'] #['training/image_2/000063.png']
+    filtered_file_names = ['training/image_2/000100.png'] #['training/image_2/000063.png']
     train_data = True
     visualize_results_wrapper(config_file, output_dir, show=show, filtered_file_names=filtered_file_names, train_data=train_data)
 

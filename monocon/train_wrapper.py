@@ -10,10 +10,14 @@ os.chdir(tools_path)
 from tools.train import main as mm3d_train
 
 # Adding arguments dynamically
-config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_stereo_debug.py')
 # config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
+# config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_debug.py')
+config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo.py')
 
-workdir = os.path.abspath('../outputs/debug_outputs_stereo_training')
+
+workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_training_bz_8_fixed_2d_bbox_and_flip_006')
+# workdir = os.path.abspath('../outputs/runs/debug_runs/lr_mom_comp_2_bz_8_stereo')
+
 sys.argv.extend([
     config_file,             # Required positional argument
     '--work-dir', workdir,    # Example optional arguments

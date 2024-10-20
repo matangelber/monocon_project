@@ -7,7 +7,8 @@ from os import path as osp
 from mmdet3d.core.visualizer.image_vis import draw_camera_bbox3d_on_img
 from .kitti_mono_dataset import KittiMonoDataset
 from mmdet.datasets import DATASETS
-from ..core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, concat_and_show_images, draw_keypoints
+from ..core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, show_2d_gt, \
+    concat_and_show_images, draw_keypoints
 from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
 from .utils import extract_result_dict, get_loading_pipeline
 from create_data_tools_monocon.data_converter.kitti_converter import get_2d_boxes
@@ -139,10 +140,13 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             # coco_image_anno = self.coco.img_ann_map[image_id]
             for i, coco_anno in enumerate(self.coco.img_ann_map[image_id]):
                 coco_anno['file_name_cam3'] = coco_anno['file_name'].replace('image_2', 'image_3')
-                coco_anno['bbox_cam3'] = anno_coco_cam3[i]['bbox']
+                keypoints = anno_coco_cam3[i]['keypoints']
+                bbox = [min(keypoints[::3]), min(keypoints[1::3]), max(keypoints[::3]) - min(keypoints[::3]),
+                        max(keypoints[1::3]) - min(keypoints[1::3])]
+                coco_anno['bbox_cam3'] = bbox
                 coco_anno['bbox_cam3d_cam3'] = anno_coco_cam3[i]['bbox_cam3d']
                 coco_anno['center2d_cam3'] = anno_coco_cam3[i]['center2d']
-                coco_anno['keypoints_cam3'] = anno_coco_cam3[i]['keypoints']
+                coco_anno['keypoints_cam3'] = keypoints
                 #
                 # coco_anno['file_name_cam3'] = coco_anno['file_name'].replace('image_2', 'image_3')
                 # coco_anno['bbox_cam3'] = bboxes_cam3[i]
@@ -187,11 +191,14 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
     def _get_data_infos_cam3(self):
         data_infos = deepcopy(self.data_infos)
         cam_intrinsic_cam3_map = {ann_info['image']['image_path'].split('/')[-1] : ann_info['calib']['P3'] for ann_info in self.anno_infos}
+        data_infos_cam3 = []
         for data_info in data_infos:
-            data_info['intrinsic_cam'] = cam_intrinsic_cam3_map[data_info['filename'].split('/')[-1]]
-            data_info['filename'] = data_info['filename'].replace('image_2', 'image_3')
-            data_info['file_name'] = data_info['filename']
-        return data_infos
+            data_info_cam3 = deepcopy(data_info)
+            data_info_cam3['cam_intrinsic'] = cam_intrinsic_cam3_map[data_info_cam3['filename'].split('/')[-1]]
+            data_info_cam3['filename'] = data_info_cam3['filename'].replace('image_2', 'image_3')
+            data_info_cam3['file_name'] = data_info_cam3['filename']
+            data_infos_cam3.append(data_info_cam3)
+        return data_infos_cam3
 
     def _add_cam3_to_coco_annotations(self):
         pass
@@ -502,6 +509,56 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 show_img_left = self.normalize_to_uint8(show_img_left)
                 show_img_right = self.normalize_to_uint8(show_img_right)
 
+                if 'gt_bboxes_3d' in res['results_cam2'].keys():
+                    show_img_left = show_2d_gt(
+                        img=show_img_left,
+                        gt_bboxes=res['results_cam2']['gt_bboxes'],
+                        out_dir=None,
+                        filename=file_name,
+                        show=False
+                    )
+
+                    show_img_right = show_2d_gt(
+                        img=show_img_right,
+                        gt_bboxes=res['results_cam3']['gt_bboxes'],
+                        out_dir=None,
+                        filename=file_name,
+                        show=False
+                    )
+
+                    show_img_left = show_3d_gt(
+                        img=show_img_left,
+                        gt_bboxes=mono_cam_box2vis(res['results_cam2']['gt_bboxes_3d']),
+                        proj_mat=res['results_cam2']['cam_intrinsic'],
+                        out_dir=None,
+                        filename=file_name,
+                        show=False
+                    )
+                    show_img_right = show_3d_gt(
+                        img=show_img_right,
+                        gt_bboxes=mono_cam_box2vis(res['results_cam3']['gt_bboxes_3d']),
+                        proj_mat=res['results_cam3']['cam_intrinsic'],
+                        out_dir=None,
+                        filename=file_name,
+                        img_metas=None,
+                        show=False
+                    )
+
+                    show_img_left = draw_keypoints(
+                        show_img_left,
+                        res['results_cam2']['gt_kpts_2d'],
+                        output_dir,
+                        file_name,
+                        show=show,
+                        suffix='left')
+
+                    show_img_right = draw_keypoints(
+                        show_img_right,
+                        res['results_cam3']['gt_kpts_2d'],
+                        output_dir,
+                        file_name,
+                        show=show,
+                        suffix='right')
                 show_img_left = self.add_text_to_image(show_img_left, f'Left - {str(t_i + 1)}: {t}')
                 show_img_right = self.add_text_to_image(show_img_right,f'Right - {str(t_i + 1)}: {t}')
 

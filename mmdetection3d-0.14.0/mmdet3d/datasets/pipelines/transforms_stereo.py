@@ -159,6 +159,24 @@ class RandomFlipMonoConStereo(RandomFlipMonoCon):
         # Call the parent class initializer to handle the shared parameters.
         super(RandomFlipMonoConStereo, self).__init__(**kwargs)
 
+
+    def flip_2d_annotations(self, results):
+        # flip bboxes
+        for key in results.get('bbox_fields', []):
+            results[key] = self.bbox_flip(results[key],
+                                          results['img_shape'],
+                                          results['flip_direction'])
+        # flip masks
+        for key in results.get('mask_fields', []):
+            results[key] = results[key].flip(results['flip_direction'])
+
+        # flip segs
+        for key in results.get('seg_fields', []):
+            results[key] = mmcv.imflip(
+                results[key], direction=results['flip_direction'])
+        return results
+
+
     def __call__(self, results):
         """Apply flipping to two synchronized image results with the same parameters.
 
@@ -188,6 +206,7 @@ class RandomFlipMonoConStereo(RandomFlipMonoCon):
         # Apply the flip transformation to results_cam3 using the same parameters
         if results_cam3['pcd_horizontal_flip']:
             self.random_flip_data_3d(results_cam3, 'horizontal')
+            self.flip_2d_annotations(results_cam3)
             results_cam3['img'] = mmcv.imflip(results_cam3['img'], direction='horizontal')
             results_cam3['transformation_3d_flow'] = results_cam2.get('transformation_3d_flow', []).copy()
 

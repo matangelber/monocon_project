@@ -82,6 +82,29 @@ def plot_rect3d_on_img(img,
 
     return img.astype(np.uint8)
 
+def plot_rect2d_on_img(img,
+                       num_rects,
+                       rect_corners,
+                       color=(0, 255, 0),
+                       thickness=1):
+    """Plot the boundary lines of 3D rectangular on 2D images.
+
+    Args:
+        img (numpy.array): The numpy array of image.
+        num_rects (int): Number of 3D rectangulars.
+        rect_corners (numpy.array): Coordinates of the corners of 3D
+            rectangulars. Should be in the shape of [num_rect, 8, 2].
+        color (tuple[int]): The color to draw bboxes. Default: (0, 255, 0).
+        thickness (int, optional): The thickness of bboxes. Default: 1.
+    """
+    for i in range(num_rects):
+        for start, end in line_indices:
+            cv2.line(img, (corners[start, 0], corners[start, 1]),
+                     (corners[end, 0], corners[end, 1]), color, thickness,
+                     cv2.LINE_AA)
+
+    return img.astype(np.uint8)
+
 
 def draw_lidar_bbox3d_on_img(bboxes3d,
                              raw_img,
