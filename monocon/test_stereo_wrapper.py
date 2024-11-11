@@ -6,13 +6,15 @@ original_sys_path = sys.path.copy()
 tools_path = os.path.abspath('../mmdetection3d-0.14.0')
 sys.path.insert(0, tools_path)
 os.chdir(tools_path)
-from tools.test import main as mm3d_test
+from test_stereo import main as mm3d_test
 
 # Adding arguments dynamically
-config_file = os.path.abspath('./configs/monocon/monocon_dla34_inference_200e_kitti_car_debug.py')
+# config_file = os.path.abspath('./configs/monocon/monocon_dla34_inference_200e_kitti_car_debug.py')
+config_file = os.path.abspath(
+    './configs/monocon/stereo_configs/monocon_dla34_inference_200e_kitti_car_stereo_debug.py')
 checkpoint_path = os.path.abspath('../monocon/checkpoints/monocon4_200.pth')
-checkpoint_path = os.path.abspath('/home/matan/Projects/MonoCon/outputs/runs/stereo_runs/stereo_training_bz_8_fixed_2d_bbox_and_flip_006/epoch_180.pth')
-workdir = os.path.abspath('../outputs/inference_runs/pretrained_results/')
+# checkpoint_path = os.path.abspath('/home/matan/Projects/MonoCon/outputs/runs/train_default_car_config_2/epoch_180.pth')
+workdir = os.path.abspath('../outputs/inference_runs/pretrained_results_stereo/')
 if not os.path.exists(workdir):
     os.mkdir(workdir)
 # Construct the list of arguments you want to add to sys.argv

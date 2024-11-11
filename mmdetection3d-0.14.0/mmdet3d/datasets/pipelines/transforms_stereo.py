@@ -45,7 +45,8 @@ class LoadImageFromFileMono3DStereo(LoadImageFromFileMono3D):
         res3 = deepcopy(res2)
         results = {'results_cam2': res2, 'results_cam3': res3}
         results['results_cam3']['img_info'] = results['results_cam3']['img_info_right']
-        results['results_cam3']['ann_info'] = results['results_cam3']['ann_info_right']
+        if 'ann_info_right' in results['results_cam3']:
+            results['results_cam3']['ann_info'] = results['results_cam3']['ann_info_right']
         super().__call__(results['results_cam2'])
         super().__call__(results['results_cam3'])
         return results

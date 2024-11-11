@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import mmcv
 import cv2
+from mmcv.utils import print_log
 from copy import deepcopy
 from os import path as osp
 from mmdet3d.core.visualizer.image_vis import draw_camera_bbox3d_on_img
@@ -12,6 +13,7 @@ from ..core import show_multi_modality_result, show_bev_multi_modality_result, s
 from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
 from .utils import extract_result_dict, get_loading_pipeline
 from create_data_tools_monocon.data_converter.kitti_converter import get_2d_boxes
+from ..core import show_bev_stereo_multi_modality_result
 
 
 EPS = 1e-12
@@ -344,6 +346,16 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         self.pre_pipeline(results)
         return self.pipeline(results)
 
+
+    def prepare_test_img(self, idx):
+        img_info_left = self.data_infos[idx]
+        img_info_right = self.data_infos_cam3[idx]
+        results = dict(img_info=img_info_left, img_info_right=img_info_right)
+        if self.proposals is not None:
+            results['proposals'] = self.proposals[idx]
+        self.pre_pipeline(results)
+        return self.pipeline(results)
+
     def __getitem__(self, idx):
         """Get training/test data after pipeline.
 
@@ -616,4 +628,115 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         image = (255 * image / image.max()).astype(np.uint8)
         image =  np.ascontiguousarray(image)
         return image
+
+
+    def show_bev_stereo(self, results, out_dir, show=True, pipeline=None):
+        """Results visualization.
+
+        Args:
+            results (list[dict]): List of bounding boxes results.
+            out_dir (str): Output directory of visualization result.
+            show (bool): Visualize the results online.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+        """
+        assert out_dir is not None, 'Expect out_dir, got none.'
+        pipeline = self._get_pipeline(pipeline)
+        for i in range(len(self.data_infos)):
+            result_left = results[2*i]
+            result_right = results[2*i+1]
+            if 'img_bbox' in result_left.keys():
+                result_left = result_left['img_bbox']
+            if 'img_bbox' in result_right.keys():
+                result_right = result_right['img_bbox']
+            data_info = self.data_infos[i]
+            img_path = data_info['file_name']
+            file_name = osp.split(img_path)[-1].split('.')[0]
+            img, cam_intrinsic = self._extract_data(i, pipeline,
+                                                ['img', 'cam_intrinsic'])
+            # need to transpose channel to first dim
+            # img = img.numpy().transpose(1, 2, 0)
+            gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
+            pred_bboxes_left = result_left['boxes_3d']
+            pred_bboxes_right = result_right['boxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes = mono_cam_box2vis(gt_bboxes)
+            # pred_bboxes = mono_cam_box2vis(pred_bboxes)
+            show_bev_stereo_multi_modality_result(
+                img,
+                gt_bboxes,
+                pred_bboxes_left,
+                pred_bboxes_right,
+                cam_intrinsic,
+                out_dir,
+                file_name,
+                box_mode='camera',
+                show=show)
+
+
+    def evaluate_stereo(self,
+                 results,
+                 metric=None,
+                 logger=None,
+                 pklfile_prefix=None,
+                 submission_prefix=None,
+                 show=False,
+                 out_dir=None):
+        """Evaluation in KITTI protocol.
+
+        Args:
+            results (list[dict]): Testing results of the dataset.
+            metric (str | list[str]): Metrics to be evaluated.
+            logger (logging.Logger | str | None): Logger used for printing
+                related information during evaluation. Default: None.
+            pklfile_prefix (str | None): The prefix of pkl files. It includes
+                the file path and the prefix of filename, e.g., "a/b/prefix".
+                If not specified, a temp file will be created. Default: None.
+            submission_prefix (str | None): The prefix of submission datas.
+                If not specified, the submission data will not be generated.
+            show (bool): Whether to visualize.
+                Default: False.
+            out_dir (str): Path to save the visualization results.
+                Default: None.
+
+        Returns:
+            dict[str, float]: Results of each evaluation metric.
+        """
+        result_files, tmp_dir = self.format_results(results, pklfile_prefix)
+        from mmdet3d.core.evaluation import kitti_eval
+        gt_annos = [info['annos'] for info in self.anno_infos]
+        gt_annos_right = [info['annos'] for info in self.anno_infos_cam3]
+        if isinstance(result_files, dict):
+            ap_dict = dict()
+            for name, result_files_ in result_files.items():
+                eval_types = ['bbox', 'bev', '3d']
+                if '2d' in name:
+                    eval_types = ['bbox']
+                ap_result_str, ap_dict_ = kitti_eval(
+                    gt_annos,
+                    result_files_,
+                    self.CLASSES,
+                    eval_types=eval_types)
+                for ap_type, ap in ap_dict_.items():
+                    ap_dict[f'{name}/{ap_type}'] = float('{:.4f}'.format(ap))
+
+                print_log(
+                    f'Results of {name}:\n' + ap_result_str, logger=logger)
+
+        else:
+            if metric == 'img_bbox2d':
+                ap_result_str, ap_dict = kitti_eval(
+                    gt_annos, result_files, self.CLASSES, eval_types=['bbox'])
+            else:
+                ap_result_str, ap_dict = kitti_eval(gt_annos, result_files,
+                                                    self.CLASSES)
+            print_log('\n' + ap_result_str, logger=logger)
+
+        if tmp_dir is not None:
+            tmp_dir.cleanup()
+        if show:
+            self.show(results, out_dir)
+        return ap_dict
+
+
 

@@ -51,3 +51,12 @@ class CollateFnStereoHook(Hook):
         """
         # Replace `collate_fn` in both train and val dataloaders
         runner.data_loader.collate_fn = partial(custom_collate_fn, samples_per_gpu=runner.data_loader.batch_size * 2)
+
+    def before_epoch(self, runner):
+        """Modify the `collate_fn` of the dataloader before the run starts.
+
+        Args:
+            runner (obj:`EpochBasedRunner`): The runner for training/validation.
+        """
+        # Replace `collate_fn` in both train and val dataloaders
+        runner.data_loader.collate_fn = partial(custom_collate_fn, samples_per_gpu=runner.data_loader.batch_size * 2)

@@ -694,6 +694,8 @@ class NuScenesMonoDataset(CocoDataset):
                 file_name,
                 box_mode='camera',
                 show=show)
+
+
 def output_to_nusc_box(detection):
     """Convert the output to the box class in the nuScenes.
 

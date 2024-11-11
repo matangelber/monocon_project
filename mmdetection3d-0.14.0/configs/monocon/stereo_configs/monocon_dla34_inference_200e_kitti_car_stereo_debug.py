@@ -1,13 +1,9 @@
 _base_ = [
     '../../_base_/models/monocon_stereo_dla34.py',
-    '../../_base_/datasets/kitti-mono3d-car-monocon_stereo_debug.py',
+    '../../_base_/datasets/kitti-mono3d-car-monocon_stereo_inference_debug.py',
     '../../_base_/schedules/cyclic_200e_monocon.py',
     '../../_base_/default_runtime.py'
 ]
-
-model = dict(
-    bbox_head=dict(num_classes=1)
-)
 
 runner = dict(type='EpochBasedRunner', max_epochs=16)
 checkpoint_config = dict(interval=8)
@@ -22,7 +18,7 @@ log_config = dict(
         dict(type='TensorboardLoggerHook'),
         dict(type='MlflowLoggerHook')
     ])
-load_from = '/home/matan/Projects/MonoCon/outputs/runs/stereo_runs/stereo_training_bz_8_fixed_2d_bbox_and_flip_006/epoch_180.pth'
+
 
 log_config = dict(
     interval=2,
@@ -44,3 +40,9 @@ custom_hooks = [
     )
 ]
 
+model = dict(
+    bbox_head=dict(
+        type='MonoConHeadInference',
+        num_classes=1
+    )
+)

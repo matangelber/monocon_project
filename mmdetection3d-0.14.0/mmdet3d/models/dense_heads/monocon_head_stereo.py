@@ -3,13 +3,14 @@ import torch
 import torch.nn as nn
 from mmcv.cnn import bias_init_with_prob, normal_init
 from mmcv.runner import force_fp32
-
 from mmdet.core import multi_apply
 from mmdet.models.builder import HEADS, build_loss
 from mmdet.models.utils.gaussian_target import (gaussian_radius, gen_gaussian_target)
 from mmdet.models.utils.gaussian_target import (get_local_maximum, get_topk_from_heatmap,
                                                 transpose_and_gather_feat)
 from mmdet3d.ops.attentive_norm import AttnBatchNorm2d
+from mmdet3d.datasets.kitti_mono_dataset_monocon_stereo import (get_delta_x_pixels, transform_alpha_cam2_to_cam3)
+
 
 INF = 1e8
 EPS = 1e-12
@@ -173,6 +174,7 @@ class MonoConHeadStereo(nn.Module):
                == len(center2kpt_offset_preds) == len(kpt_heatmap_preds) == len(kpt_heatmap_offset_preds) \
                == len(dim_preds) == len(alpha_cls_preds) == len(alpha_offset_preds) == 1
 
+
         center_heatmap_pred = center_heatmap_preds[0]
         wh_pred = wh_preds[0]
         offset_pred = offset_preds[0]
@@ -216,7 +218,35 @@ class MonoConHeadStereo(nn.Module):
 
         # select desired preds and labels based on mask
 
+        ###########################################################################
+        center_heatmap_pred_local_maxima = get_local_maximum(
+            center_heatmap_pred.clone().detach(), kernel=3)
 
+        *batch_dets, ys, xs = get_topk_from_heatmap(
+            center_heatmap_pred_local_maxima, k=30)
+        batch_scores, batch_index, batch_topk_labels = batch_dets
+        wh_local_maxima = transpose_and_gather_feat(wh_pred, batch_index)
+        center_consistency_heatmap = self.get_center_heatmap(gt_bboxes, gt_labels,
+                                                             gt_bboxes_3d,
+                                                             center_heatmap_pred,
+                                                             centers2d,
+                                                             depths,
+                                                             img_metas)
+        decoded_heatmaps = self.decode_heatmap(
+            center_heatmap_pred,
+            wh_pred,
+            offset_pred,
+            center2kpt_offset_pred,
+            kpt_heatmap_pred,
+            kpt_heatmap_offset_pred,
+            dim_pred,
+            alpha_cls_pred,
+            alpha_offset_pred,
+            depth_pred,
+            img_metas,
+            k=100,
+            kernel=3,
+            thresh=0.4)
         #### FOR DEBUG: ###########################################################
         from mmdet3d.core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, concat_and_show_images, draw_keypoints
 
@@ -232,49 +262,104 @@ class MonoConHeadStereo(nn.Module):
         a_dim = to_np(dim_target)
         a_offset = to_np(offset_target)
         a_depth = to_np(depth_target)
-        a_kpt_heatmap = to_np(kpt_heatmap_offset_target)
+        a_kpt_heatmap = to_np(kpt_heatmap_target)
         a_center_heatmap = to_np(center_heatmap_target)
+        center_heatmap_pred_local_maxima = to_np(center_heatmap_pred_local_maxima)
+        a_center_consistency_heatmap = to_np(center_consistency_heatmap)
+        a_center_heatmap_pred = to_np(center_heatmap_pred)
         a_mask = to_np(mask_target)
-        concat_and_show_images(a_kpt_heatmap[0], a_kpt_heatmap[1],
-                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss", filename='kpt_heatmap')
-        concat_and_show_images(255 * a_center_heatmap[2][0], 255 * a_center_heatmap[3][0],
-                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss", filename='center_heatmap',
+        ### center_heatmap_target
+        concat_and_show_images(255 * a_center_heatmap[0][0], 255 * a_center_heatmap[1][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss", filename='center_heatmap_0',
                                show=False, suffix="")
-        concat_and_show_images(255 * (a_center_heatmap[0][0] - a_center_heatmap[1][0]),
-                               255 * (a_center_heatmap[2][0] - a_center_heatmap[3][0]),
+        concat_and_show_images(255 * a_center_heatmap[2][0], 255 * a_center_heatmap[3][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss", filename='center_heatmap_1',
+                               show=False, suffix="")
+        concat_and_show_images(255 * np.abs((a_center_heatmap[0][0] - a_center_heatmap[1][0])),
+                               255 * np.abs((a_center_heatmap[2][0] - a_center_heatmap[3][0])),
                                out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
                                filename='center_heatmap_diff', show=False, suffix="")
-
+        ### kpts heatmap
+        concat_and_show_images(255 * a_kpt_heatmap[0].sum(0), 255 * a_kpt_heatmap[1].sum(0),
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss", filename='kpts_heatmap_0',
+                               show=False, suffix="")
+        concat_and_show_images(255 * a_kpt_heatmap[2].sum(0), 255 * a_kpt_heatmap[3].sum(0),
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss", filename='kpts_heatmap_1',
+                               show=False, suffix="")
+        concat_and_show_images(255 * np.abs((a_kpt_heatmap[0].sum(0) - a_kpt_heatmap[1].sum(0))),
+                               255 * np.abs((a_kpt_heatmap[2].sum(0) - a_kpt_heatmap[3].sum(0))),
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='kpts_heatmap_diff', show=False, suffix="")
+        ### center_heatmap_pred
+        concat_and_show_images(255 * a_center_heatmap_pred[0][0], 255 * a_center_heatmap_pred[1][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='center_heatmap_pred_0',
+                               show=False, suffix="")
+        concat_and_show_images(255 * a_center_heatmap_pred[2][0], 255 * a_center_heatmap_pred[3][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='center_heatmap_pred_1',
+                               show=False, suffix="")
+        concat_and_show_images(255 * np.abs((a_center_heatmap_pred[0][0] - a_center_heatmap_pred[1][0])),
+                               255 * np.abs((a_center_heatmap_pred[2][0] - a_center_heatmap_pred[3][0])),
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='center_heatmap_pred_diff', show=False, suffix="")
+        ### local maxima pred
+        concat_and_show_images(255 * center_heatmap_pred_local_maxima[0][0], 255 * center_heatmap_pred_local_maxima[1][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='center_heatmap_pred_local_maxima_0',
+                               show=False, suffix="")
+        concat_and_show_images(255 * center_heatmap_pred_local_maxima[2][0], 255 * center_heatmap_pred_local_maxima[3][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='center_heatmap_pred_local_maxima_1',
+                               show=False, suffix="")
+        ### center_heatmap consistency
+        concat_and_show_images(255 * a_center_consistency_heatmap[0][0], 255 * a_center_consistency_heatmap[1][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='center_consistency_heatmap_0',
+                               show=False, suffix="")
+        concat_and_show_images(255 * a_center_consistency_heatmap[2][0], 255 * a_center_consistency_heatmap[3][0],
+                               out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                               filename='center_consistency_heatmap_1',
+                               show=False, suffix="")
         ###########################################################################
+
         # 2d offset ToDo: project to correct camoffset_pred_stereo = self.extract_stereo_input_from_tensor(offset_pred, indices, mask_target)
+        offset_target_consistency_stereo = self.extract_stereo_input_and_switch_from_tensor(offset_pred, indices, mask_target)
         offset_pred_stereo = self.extract_stereo_input_from_tensor(offset_pred, indices, mask_target)
-        offset_pred = self.extract_input_from_tensor(offset_pred, indices, mask_target)
+        offset_pred = offset_pred_stereo.reshape(-1, offset_pred_stereo.size(-1))
+        offset_target_stereo = self.extract_stereo_target_from_tensor(offset_target, mask_target)
         offset_target = self.extract_target_from_tensor(offset_target, mask_target)
         # 2d size
+        wh_target_consistency_stereo = self.extract_stereo_input_and_switch_from_tensor(wh_pred, indices, mask_target)
         wh_pred_stereo = self.extract_stereo_input_from_tensor(wh_pred, indices, mask_target)
-        wh_pred = self.extract_input_from_tensor(wh_pred, indices, mask_target)
+        wh_pred = wh_pred_stereo.reshape(-1, wh_pred_stereo.size(-1))
+        wh_target_stereo = self.extract_stereo_target_from_tensor(wh_target, mask_target)
         wh_target = self.extract_target_from_tensor(wh_target, mask_target)
         # 3d dim
+        dim_target_consistency_stereo = self.extract_stereo_input_and_switch_from_tensor(dim_pred, indices, mask_target)
         dim_pred_stereo = self.extract_stereo_input_from_tensor(dim_pred, indices, mask_target)
-        dim_pred = self.extract_input_from_tensor(dim_pred, indices, mask_target)
+        dim_pred = dim_pred_stereo.T.reshape(-1, dim_pred_stereo.size(-1))
+        dim_target_stereo = self.extract_stereo_target_from_tensor(dim_target, mask_target)
         dim_target = self.extract_target_from_tensor(dim_target, mask_target)
         # depth
+        depth_target_consistency_stereo = self.extract_stereo_input_and_switch_from_tensor(depth_pred, indices, mask_target)
+        depth_target_consistency_stereo = depth_target_consistency_stereo.T.reshape(-1, depth_target_consistency_stereo.size(-1))
         depth_pred_stereo = self.extract_stereo_input_from_tensor(depth_pred, indices, mask_target)
-        depth_pred = self.extract_input_from_tensor(depth_pred, indices, mask_target)
+        depth_pred = depth_pred_stereo.T.reshape(-1, depth_pred_stereo.size(-1))
+        depth_target_stereo = self.extract_stereo_target_from_tensor(depth_target, mask_target)
         depth_target = self.extract_target_from_tensor(depth_target, mask_target)
         # alpha cls ToDo: project to correct cam
-        alpha_cls_stereo = self.extract_stereo_input_from_tensor(alpha_cls_pred, indices, mask_target)
-        alpha_cls_pred = self.extract_input_from_tensor(alpha_cls_pred, indices, mask_target)
+        alpha_target_consistency_stereo = self.extract_stereo_input_and_switch_from_tensor(alpha_cls_pred, indices, mask_target)
+        alpha_cls_pred_stereo = self.extract_stereo_input_from_tensor(alpha_cls_pred, indices, mask_target)
+        alpha_cls_pred = alpha_cls_pred_stereo.T.reshape(-1, alpha_cls_pred_stereo.size(-1))
         alpha_cls_target = self.extract_target_from_tensor(alpha_cls_target, mask_target).type(torch.long)
         alpha_cls_onehot_target = alpha_cls_target.new_zeros([len(alpha_cls_target), self.num_alpha_bins]).scatter_(
             dim=1, index=alpha_cls_target.view(-1, 1), value=1)
         # alpha offset ToDo: project to correct cam
-        alpha_offset_pred_stereo = self.extract_stereo_input_from_tensor(alpha_offset_pred, indices, mask_target)
         alpha_offset_pred = self.extract_input_from_tensor(alpha_offset_pred, indices, mask_target)
-        alpha_offset_pred = torch.sum(alpha_offset_pred * alpha_cls_onehot_target, 1, keepdim=True)
+        alpha_offset_pred = torch.sum(alpha_offset_pred.reshape(-1, alpha_offset_pred.size(-1)) * alpha_cls_onehot_target, 1, keepdim=True)
         alpha_offset_target = self.extract_target_from_tensor(alpha_offset_target, mask_target)
         # center2kpt offset
-        center2kpt_offset_pred_stereo = self.extract_stereo_input_from_tensor(center2kpt_offset_pred, indices, mask_target)
         center2kpt_offset_pred = self.extract_input_from_tensor(center2kpt_offset_pred,
                                                                 indices, mask_target)  # B * (num_kpt * 2)
         center2kpt_offset_target = self.extract_target_from_tensor(center2kpt_offset_target, mask_target)
@@ -316,6 +401,37 @@ class MonoConHeadStereo(nn.Module):
             loss_alpha_cls = 0.0
         loss_alpha_reg = self.loss_alpha_reg(alpha_offset_pred, alpha_offset_target)
 
+
+        ###############################################################
+        #################### calculate stereo loss ####################
+        ###############################################################
+        # loss_center_heatmap = self.loss_center_heatmap(center_heatmap_pred, center_heatmap_target)
+        # loss_kpt_heatmap = self.loss_kpt_heatmap(kpt_heatmap_pred, kpt_heatmap_target)
+        #
+        # loss_wh_stereo = self.loss_wh(wh_pred, wh_pred_stereo)
+        # if self.dim_aware_in_loss:
+        #     loss_dim_stereo = self.loss_dim(dim_pred, dim_target_consistency_stereo, dim_pred)
+        # else:
+        #     loss_dim_stereo = self.loss_dim(dim_pred, dim_target_consistency_stereo)
+        #
+        # depth_pred, depth_log_variance = depth_pred[:, 0:1], depth_pred[:, 1:2]
+        depth_target_consistency_stereo, _ = depth_target_consistency_stereo[:, 0:1], depth_target_consistency_stereo[:, 1:2]
+        loss_depth_stereo = self.loss_depth(depth_pred, depth_target_consistency_stereo.reshape(-1, 1), depth_log_variance)
+        #
+        # center2kpt_offset_pred *= mask_center2kpt_offset
+        # loss_center2kpt_offset = self.loss_center2kpt_offset(center2kpt_offset_pred, center2kpt_offset_target,
+        #                                                      avg_factor=(mask_center2kpt_offset.sum() + EPS))
+        #
+        # kpt_heatmap_offset_pred *= mask_kpt_heatmap_offset
+        # loss_kpt_heatmap_offset = self.loss_kpt_heatmap_offset(kpt_heatmap_offset_pred, kpt_heatmap_offset_target,
+        #                                                        avg_factor=(mask_kpt_heatmap_offset.sum() + EPS))
+        #
+        # if mask_target.sum() > 0:
+        #     loss_alpha_cls = self.loss_alpha_cls(alpha_cls_pred, alpha_cls_onehot_target)
+        # else:
+        #     loss_alpha_cls = 0.0
+        # loss_alpha_reg = self.loss_alpha_reg(alpha_offset_pred, alpha_offset_target)
+
         return dict(
             loss_center_heatmap=loss_center_heatmap,
             loss_wh=loss_wh,
@@ -328,6 +444,66 @@ class MonoConHeadStereo(nn.Module):
             loss_alpha_reg=loss_alpha_reg,
             loss_depth=loss_depth,
         )
+
+    def get_k_local_maximas(self, center_heatmap_pred):
+        center_heatmap_pred_local_maxima = get_local_maximum(
+            center_heatmap_pred.clone().detach(), kernel=3)
+
+        *batch_dets, ys, xs = get_topk_from_heatmap(
+            center_heatmap_pred_local_maxima, k=30)
+        batch_scores, batch_index, batch_topk_labels = batch_dets
+        return batch_scores, ys, xs
+
+    def get_center_heatmap(self, gt_bboxes, gt_labels,
+                           gt_bboxes_3d,
+                           center_heatmap_pred,
+                           centers2d,
+                           depths,
+                           img_metas):
+        img_h, img_w = img_metas[0]['pad_shape'][:2]
+        bs, _, feat_h, feat_w = center_heatmap_pred.size()
+
+        width_ratio = float(feat_w / img_w)
+        height_ratio = float(feat_h / img_h)
+
+        calibs = []
+
+        # objects as 2D center points
+        center_heatmap_target = gt_bboxes[-1].new_zeros([bs, self.num_classes, feat_h, feat_w])
+        scores, ys, xs = self.get_k_local_maximas(center_heatmap_pred)
+        pred_centers = torch.cat([xs.unsqueeze(-1).float(), ys.unsqueeze(-1).float()], dim=-1)
+        for batch_id in range(bs):
+            img_meta = img_metas[batch_id]
+            cam_p2 = img_meta['cam_intrinsic']
+
+            gt_bbox = gt_bboxes[batch_id]
+            calibs.append(cam_p2)
+            if len(gt_bbox) < 1:
+                continue
+            gt_label = gt_labels[batch_id]
+            gt_bbox_3d = gt_bboxes_3d[batch_id]
+            if not isinstance(gt_bbox_3d, torch.Tensor):
+                gt_bbox_3d = gt_bbox_3d.tensor.to(gt_bbox.device)
+            center_x = (gt_bbox[:, [0]] + gt_bbox[:, [2]]) * width_ratio / 2
+            center_y = (gt_bbox[:, [1]] + gt_bbox[:, [3]]) * height_ratio / 2
+            gt_centers = torch.cat((center_x, center_y), dim=1)
+            distances = torch.cdist(gt_centers, pred_centers[batch_id])
+            closest_indices = torch.argmin(distances, dim=1)
+            closest_pred_centers = pred_centers[batch_id][closest_indices]
+            for j, ct in enumerate(closest_pred_centers):
+                ctx_int, cty_int = ct.int()
+                ctx, cty = ct
+                scale_box_h = (gt_bbox[j][3] - gt_bbox[j][1]) * height_ratio
+                scale_box_w = (gt_bbox[j][2] - gt_bbox[j][0]) * width_ratio
+                radius = gaussian_radius([scale_box_h, scale_box_w],
+                                         min_overlap=0.3)
+                radius = max(0, int(radius))
+                ind = gt_label[j]
+                gen_gaussian_target(center_heatmap_target[batch_id, ind],
+                                    [ctx_int, cty_int], radius)
+        return center_heatmap_target
+
+
 
     def get_targets(self, gt_bboxes, gt_labels,
                     gt_bboxes_3d,
@@ -485,17 +661,27 @@ class MonoConHeadStereo(nn.Module):
         return input[mask]
 
     @staticmethod
+    def extract_stereo_input_from_tensor(input, ind, mask):
+        input = transpose_and_gather_feat(input, ind)
+        return torch.stack([input[::2,:,:][mask[::2,:]], input[1::2,:,:][mask[1::2,:]]], dim=0)
+
+    @staticmethod
     def extract_target_from_tensor(target, mask):
         return target[mask]
 
     @staticmethod
-    def extract_stereo_input_from_tensor(input, ind, mask):
+    def extract_stereo_target_from_tensor(target, mask):
+        return torch.stack([target[::2,:,:][mask[::2,:]], target[1::2,:,:][mask[1::2,:]]], dim=0)
+
+    @staticmethod
+    def extract_stereo_input_and_switch_from_tensor(input, ind, mask):
         input = transpose_and_gather_feat(input, ind)
         batch_size = input.size(0)
         index_tensor = torch.stack((torch.arange(1, batch_size, 2), torch.arange(0, batch_size, 2)), dim=1).view(-1)
         target_stereo_input = input.clone().detach()
         target_stereo_input = target_stereo_input[index_tensor]
-        return target_stereo_input[mask]
+        return torch.stack(
+            [target_stereo_input[::2, :, :][mask[::2, :]], target_stereo_input[1::2, :, :][mask[1::2, :]]], dim=0)
 
     def angle2class(self, angle):
         ''' Convert continuous angle to discrete class and residual. '''
@@ -586,17 +772,18 @@ class MonoConHeadStereo(nn.Module):
                        alpha_cls_pred,
                        alpha_offset_pred,
                        depth_pred,
-                       img_shape,
-                       camera_intrinsic,
+                       img_metas,
                        k=100,
                        kernel=3,
                        thresh=0.4):
+        img_shape = img_metas[0]['pad_shape']
+        camera_intrinsic = np.array([img_meta['cam_intrinsic'] for img_meta in img_metas])
         batch, cat, height, width = center_heatmap_pred.shape
-        assert batch == 1
-        inp_h, inp_w = img_shape
+        # assert batch == 1
+        inp_h, inp_w, _ = img_shape
 
         center_heatmap_pred = get_local_maximum(
-            center_heatmap_pred, kernel=kernel)
+            center_heatmap_pred.clone().detach(), kernel=kernel)
 
         *batch_dets, ys, xs = get_topk_from_heatmap(
             center_heatmap_pred, k=k)
@@ -643,11 +830,11 @@ class MonoConHeadStereo(nn.Module):
         center2d = kpts  # (b, k, 2)
 
         # 2. recover rotY
-        rot_y = self.recover_rotation(kpts, alpha, camera_intrinsic)  # (b, k, 3)
+        rot_y = torch.stack([self.recover_rotation(k.unsqueeze(0), a.unsqueeze(0), ci).squeeze(1) for (k, a, ci) in zip(kpts, alpha, camera_intrinsic)])  # (b, k, 3)
 
         # 2.5 recover box3d_center from center2d and depth
-        center3d = torch.cat([center2d, depth], dim=-1).squeeze(0)
-        center3d = self.pts2Dto3D(center3d, np.array(camera_intrinsic)).unsqueeze(0)
+        center3d = [torch.cat([c2d, d], dim=-1) for (c2d,d) in zip (center2d, depth)]
+        center3d = torch.stack([self.pts2Dto3D(c3d, np.array(ci)) for (c3d, ci) in zip(center3d, camera_intrinsic)])
 
         # 3. compose 3D box
         batch_bboxes_3d = torch.cat([center3d, dim, rot_y], dim=-1)
@@ -658,6 +845,7 @@ class MonoConHeadStereo(nn.Module):
         batch_topk_labels = batch_topk_labels[mask]
 
         return batch_bboxes, batch_bboxes_3d, batch_topk_labels
+
 
     def recover_rotation(self, kpts, alpha, calib):
         device = kpts.device
