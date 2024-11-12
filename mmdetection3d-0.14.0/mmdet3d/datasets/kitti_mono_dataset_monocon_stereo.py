@@ -14,57 +14,38 @@ from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
 from .utils import extract_result_dict, get_loading_pipeline
 from create_data_tools_monocon.data_converter.kitti_converter import get_2d_boxes
 from ..core import show_bev_stereo_multi_modality_result
-
+from ..core.utils import get_delta_x_meters, get_delta_x_pixels
 
 EPS = 1e-12
 INF = 1e10
 
-def transform_alpha_cam2_to_cam3(alpha_cam2, P2, P3, depth):
+def transform_alpha_cam2_to_cam3(source_alpha, P_source, P_dest, depth):
     """
     Transforms the alpha angle of an object from camera 2 to camera 3.
 
     Parameters:
-    - alpha_cam2: The alpha angle in camera 2 (in radians)
-    - P2: Projection matrix for camera 2 (3x4 numpy array)
-    - P3: Projection matrix for camera 3 (3x4 numpy array)
+    - source_alpha: The alpha angle in camera 2 (in radians)
+    - source_cam: Projection matrix for camera 2 (3x4 numpy array)
+    - dest_cam: Projection matrix for camera 3 (3x4 numpy array)
     - depth: Depth of the object in the z-axis (in meters, relative to camera 2)
 
     Returns:
     - alpha_cam3: Transformed alpha angle in camera 3 (in radians)
     """
     # Extract the translation components from the projection matrices
-    t2 = P2[0, 3] / P2[0, 0]  # Translation component for camera 2
-    t3 = P3[0, 3] / P3[0, 0]  # Translation component for camera 3
+    t_source = P_source[0, 3] / P_source[0, 0]  # Translation component for camera 2
+    t_dest = P_dest[0, 3] / P_dest[0, 0]  # Translation component for camera 3
 
     # Calculate the change in viewing angle (delta alpha) due to the shift
-    delta_alpha = np.arctan((t3 - t2) / depth)
+    delta_alpha = np.arctan((t_dest - t_source) / depth)
 
     # Adjust the alpha angle with respect to camera 3
-    alpha_cam3 = alpha_cam2
+    alpha_cam3 = source_alpha
     cond_in_range = np.vectorize(lambda x: (x > -np.pi) & (x < np.pi))
     alpha_cam3[cond_in_range(alpha_cam3)] = (alpha_cam3 + delta_alpha)[cond_in_range(alpha_cam3)]
     return alpha_cam3
 
-def get_delta_x_pixels(P_source, P_dest, depth):
-    # Extract the translation components from the projection matrices
-    t_source = P_source[0, 3]
-    t_dest = P_dest[0, 3]
-
-    # Calculate the horizontal shift in pixels between camera 2 and camera 3
-    delta_x = (t_dest - t_source) / depth
-    return delta_x
-
-def get_delta_x_meters(P_source, P_dest):
-    # Extract the translation components from the projection matrices
-    t_source = P_source[0, 3] / P_source[0, 0]  # Translation component for camera 2
-    t_dest = P_dest[0, 3] / P_dest[0, 0]  # Translation component for camera 3
-
-    # Calculate the horizontal shift in pixels between camera 2 and camera 3
-    delta_x = t_dest - t_source
-    return delta_x
-
-
-def transform_bbox_cam2_to_cam3(bbox, P2, P3):
+def transform_bbox_cam2_to_cam3(bbox, P2, P3, depth):
     """
     Transforms a 2D bounding box from camera 2 to camera 3 in the KITTI dataset.
 
@@ -77,7 +58,7 @@ def transform_bbox_cam2_to_cam3(bbox, P2, P3):
     - bbox_cam3: Transformed bounding box in camera 3 [x_min_cam3, y_min, x_max_cam3, y_max]
     """
     # Calculate the horizontal shift in pixels between camera 2 and camera 3
-    delta_x = get_delta_x_meters(P2, P3)
+    delta_x = get_delta_x_pixels(P2, P3, depth)
     # Transform the bounding box from camera 2 to camera 3 by shifting the x-coordinates
     bbox_cam3 = bbox.copy()
     bbox_cam3[:, 0] += delta_x  # x_min_cam3 = x_min_cam2 + delta_x
@@ -113,13 +94,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         self.add_cam3_to_coco_annotations()
 
     def add_cam3_to_coco_annotations(self):
-        def bboxes_3d_to_img_pixels(bbox_3d):
-            bbox_3d = CameraInstance3DBoxes(
-                np.array(bbox_3d).reshape(1, -1),
-                box_dim=np.array(bbox_3d).shape[-1],
-                origin=(0.5, 0.5, 0.5))
-
-
         cond_in_set = np.vectorize(lambda x: x in ['Car', 'Pedestrian', 'Cyclist'])
         for anno in self.anno_infos_cam3:
             anno_coco_cam3 = [a for a in get_2d_boxes(anno, anno['annos']['occluded'], mono3d=True, proj_matrix='P3') if
@@ -134,12 +108,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             bboxes_cam3 = annos['bbox']
             wh = bboxes_cam3[:, 2:] - bboxes_cam3[:, :2]
             bboxes_cam3[:, 2:] = wh # in coco indices 3,4 are w, h instead of x2, y2 like in KITTI
-            P0 = anno['calib']['P0']
-            P2 = anno['calib']['P2']
-            P3 = anno['calib']['P3']
-            x_offset_from_cam0 = get_delta_x_meters(P0, P3)
-            x_offset_from_cam2 = get_delta_x_meters(P2, P3)
-            # coco_image_anno = self.coco.img_ann_map[image_id]
             for i, coco_anno in enumerate(self.coco.img_ann_map[image_id]):
                 coco_anno['file_name_cam3'] = coco_anno['file_name'].replace('image_2', 'image_3')
                 keypoints = anno_coco_cam3[i]['keypoints']
@@ -149,15 +117,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 coco_anno['bbox_cam3d_cam3'] = anno_coco_cam3[i]['bbox_cam3d']
                 coco_anno['center2d_cam3'] = anno_coco_cam3[i]['center2d']
                 coco_anno['keypoints_cam3'] = keypoints
-                #
-                # coco_anno['file_name_cam3'] = coco_anno['file_name'].replace('image_2', 'image_3')
-                # coco_anno['bbox_cam3'] = bboxes_cam3[i]
-                # coco_anno['bbox_cam3d_cam3'] = deepcopy(coco_anno['bbox_cam3d_cam0'])
-                # coco_anno['bbox_cam3d_cam3'][0] += x_offset_from_cam0
-                # coco_anno['center2d_cam3'] = deepcopy(coco_anno['center2d'])
-                # coco_anno['center2d_cam3'][0] = x_offset_from_cam2
-                # coco_anno['keypoints_cam3'] = deepcopy(coco_anno['keypoints'])
-                # coco_anno['keypoints_cam3'][::3] += x_offset_from_cam2
         return
 
     def get_ann_info_cam3(self, idx):
@@ -184,10 +143,11 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         for ann_info in anno_infos:
             ann_info['image']['image_path'] = ann_info['image']['image_path'].replace('image_2', 'image_3')
             ann_info['annos']['bbox'] = transform_bbox_cam2_to_cam3(ann_info['annos']['bbox'],
-                                                                    ann_info['calib']['P2'], ann_info['calib']['P3'])
+                                                                    ann_info['calib']['P2'], ann_info['calib']['P3'],
+                                                                     ann_info['annos']['location'][:, 2])
             ann_info['annos']['alpha'] = transform_alpha_cam2_to_cam3(ann_info['annos']['alpha'],
                                                                     ann_info['calib']['P2'], ann_info['calib']['P3'],
-                                                                     ann_info['annos']['dimensions'][:, 2])
+                                                                     ann_info['annos']['location'][:, 2])
         return anno_infos
 
     def _get_data_infos_cam3(self):
@@ -201,9 +161,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             data_info_cam3['file_name'] = data_info_cam3['filename']
             data_infos_cam3.append(data_info_cam3)
         return data_infos_cam3
-
-    def _add_cam3_to_coco_annotations(self):
-        pass
 
     def _parse_ann_info(self, img_info, ann_info):
         """Parse bbox and mask annotation.
@@ -396,8 +353,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                                                 ['img', 'cam_intrinsic'])
             img_cam3, cam_intrinsic_cam3 = self._extract_data_cam3(i, pipeline,
                                                     ['img', 'cam_intrinsic'])
-            # need to transpose channel to first dim
-            # img = img.numpy().transpose(1, 2, 0)
+
             gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
             # TODO: remove the hack of box from NuScenesMonoDataset
             gt_bboxes = mono_cam_box2vis(gt_bboxes) # local yaw -> global yaw

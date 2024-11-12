@@ -830,7 +830,7 @@ class MonoConHeadStereo(nn.Module):
         center2d = kpts  # (b, k, 2)
 
         # 2. recover rotY
-        rot_y = torch.stack([self.recover_rotation(k.unsqueeze(0), a.unsqueeze(0), ci).squeeze(1) for (k, a, ci) in zip(kpts, alpha, camera_intrinsic)])  # (b, k, 3)
+        rot_y = torch.stack([self.recover_rotation(k.unsqueeze(0), a.unsqueeze(0), ci) for (k, a, ci) in zip(kpts, alpha, camera_intrinsic)]).squeeze(1)  # (b, k, 3)
 
         # 2.5 recover box3d_center from center2d and depth
         center3d = [torch.cat([c2d, d], dim=-1) for (c2d,d) in zip (center2d, depth)]
