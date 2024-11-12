@@ -210,6 +210,9 @@ class RandomFlipMonoConStereo(RandomFlipMonoCon):
             self.flip_2d_annotations(results_cam3)
             results_cam3['img'] = mmcv.imflip(results_cam3['img'], direction='horizontal')
             results_cam3['transformation_3d_flow'] = results_cam2.get('transformation_3d_flow', []).copy()
+            #flip camera projection translations
+            results_cam2['cam_intrinsic'][0, 3] = -results_cam2['cam_intrinsic'][0, 3]
+            results_cam3['cam_intrinsic'][0, 3] = -results_cam3['cam_intrinsic'][0, 3]
 
         # Update the main results dict
         results['results_cam2'] = results_cam2
