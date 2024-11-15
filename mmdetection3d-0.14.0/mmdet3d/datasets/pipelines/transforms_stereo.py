@@ -49,6 +49,9 @@ class LoadImageFromFileMono3DStereo(LoadImageFromFileMono3D):
             results['results_cam3']['ann_info'] = results['results_cam3']['ann_info_right']
         super().__call__(results['results_cam2'])
         super().__call__(results['results_cam3'])
+        results['results_cam2']['cam_intrinsic'] = np.array(results['results_cam2']['cam_intrinsic'])
+        results['results_cam3']['cam_intrinsic'] = np.array(results['results_cam3']['cam_intrinsic'])
+
         return results
 
 @PIPELINES.register_module()
@@ -194,7 +197,8 @@ class RandomFlipMonoConStereo(RandomFlipMonoCon):
         # Use the first camera results to decide the flip parameters
         results_cam2 = results['results_cam2']
         results_cam3 = results['results_cam3']
-
+        cam_intrinsic_cam2 = results_cam2['cam_intrinsic']
+        cam_intrinsic_cam3 = results_cam3['cam_intrinsic']
         # Apply the parent class __call__ to get the flip parameters for results_cam2
         results_cam2 = super(RandomFlipMonoConStereo, self).__call__(results_cam2)
 
@@ -203,16 +207,17 @@ class RandomFlipMonoConStereo(RandomFlipMonoCon):
         results_cam3['flip_direction'] = results_cam2['flip_direction']
         results_cam3['pcd_horizontal_flip'] = results_cam2['pcd_horizontal_flip']
         results_cam3['pcd_vertical_flip'] = results_cam2['pcd_vertical_flip']
-
         # Apply the flip transformation to results_cam3 using the same parameters
         if results_cam3['pcd_horizontal_flip']:
             self.random_flip_data_3d(results_cam3, 'horizontal')
             self.flip_2d_annotations(results_cam3)
             results_cam3['img'] = mmcv.imflip(results_cam3['img'], direction='horizontal')
             results_cam3['transformation_3d_flow'] = results_cam2.get('transformation_3d_flow', []).copy()
+            cam_intrinsic_cam2 = results_cam2['cam_intrinsic']
+            cam_intrinsic_cam3 = results_cam3['cam_intrinsic']
             #flip camera projection translations
-            results_cam2['cam_intrinsic'][0, 3] = -results_cam2['cam_intrinsic'][0, 3]
-            results_cam3['cam_intrinsic'][0, 3] = -results_cam3['cam_intrinsic'][0, 3]
+            # results_cam2['cam_intrinsic'][0, 3] = -cam_intrinsic_cam2
+            # results_cam3['cam_intrinsic'][0, 3] = -cam_intrinsic_cam3
 
         # Update the main results dict
         results['results_cam2'] = results_cam2
