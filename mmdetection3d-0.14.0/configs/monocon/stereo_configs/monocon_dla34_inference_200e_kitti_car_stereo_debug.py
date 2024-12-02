@@ -7,7 +7,7 @@ _base_ = [
 
 runner = dict(type='EpochBasedRunner', max_epochs=16)
 checkpoint_config = dict(interval=8)
-evaluation = dict(interval=4)
+evaluation = dict(interval=2)
 workflow = [('train', 1)]
 
 

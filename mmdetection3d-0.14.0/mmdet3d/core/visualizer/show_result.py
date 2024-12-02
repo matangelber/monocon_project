@@ -461,8 +461,8 @@ def draw_keypoints(img,
                out_dir,
                filename,
                show=False,
-               suffix="",
-               gt_keypoints_color=(61, 102, 0)):
+               suffix=""
+               ):
     """Convert multi-modality detection results into 2D results.
 
     Project the predicted 3D bbox to 2D image plane and visualize them.
@@ -487,7 +487,7 @@ def draw_keypoints(img,
     show_img = img.copy()
     if keypoints is not None:
         show_img = draw_keypoints_on_img(
-            show_img, keypoints, color=gt_keypoints_color)
+            show_img, keypoints)
     if show:
         mmcv.imshow(show_img, win_name=f'{filename} - keypoints_of_img', wait_time=0)
     if out_dir:

@@ -662,6 +662,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         from mmdet3d.core.evaluation import kitti_eval
         gt_annos = [info['annos'] for info in self.anno_infos]
         gt_annos_right = [info['annos'] for info in self.anno_infos_cam3]
+        gt_annos_all = [gt_annos[i // 2] if i % 2 == 0 else gt_annos_right[i // 2] for i in range(len(results))]
         if isinstance(result_files, dict):
             ap_dict = dict()
             for name, result_files_ in result_files.items():
@@ -669,7 +670,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 if '2d' in name:
                     eval_types = ['bbox']
                 ap_result_str, ap_dict_ = kitti_eval(
-                    gt_annos,
+                    gt_annos_all,
                     result_files_,
                     self.CLASSES,
                     eval_types=eval_types)
@@ -694,5 +695,239 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             self.show(results, out_dir)
         return ap_dict
 
+
+
+    def bbox2result_kitti(self,
+                          net_outputs,
+                          class_names,
+                          pklfile_prefix=None,
+                          submission_prefix=None):
+        """Convert 3D detection results to kitti format for evaluation and test
+        submission.
+
+        Args:
+            net_outputs (list[np.ndarray]): List of array storing the \
+                inferenced bounding boxes and scores.
+            class_names (list[String]): A list of class names.
+            pklfile_prefix (str | None): The prefix of pkl file.
+            submission_prefix (str | None): The prefix of submission file.
+
+        Returns:
+            list[dict]: A list of dictionaries with the kitti format.
+        """
+        assert len(net_outputs) == len(self.anno_infos)
+        if submission_prefix is not None:
+            mmcv.mkdir_or_exist(submission_prefix)
+
+        det_annos = []
+        print('\nConverting prediction to KITTI format')
+        for idx, pred_dicts in enumerate(
+                mmcv.track_iter_progress(net_outputs)):
+            annos = []
+            info = self.anno_infos[idx]
+            sample_idx = info['image']['image_idx']
+            image_shape = info['image']['image_shape'][:2]
+
+            box_dict = self.convert_valid_bboxes(pred_dicts, info)
+            anno = {
+                'name': [],
+                'truncated': [],
+                'occluded': [],
+                'alpha': [],
+                'bbox': [],
+                'dimensions': [],
+                'location': [],
+                'rotation_y': [],
+                'score': []
+            }
+            if len(box_dict['bbox']) > 0:
+                box_2d_preds = box_dict['bbox']
+                box_preds = box_dict['box3d_camera']
+                scores = box_dict['scores']
+                box_preds_lidar = box_dict['box3d_lidar']
+                label_preds = box_dict['label_preds']
+
+                for box, box_lidar, bbox, score, label in zip(
+                        box_preds, box_preds_lidar, box_2d_preds, scores,
+                        label_preds):
+                    bbox[2:] = np.minimum(bbox[2:], image_shape[::-1])
+                    bbox[:2] = np.maximum(bbox[:2], [0, 0])
+                    anno['name'].append(class_names[int(label)])
+                    anno['truncated'].append(0.0)
+                    anno['occluded'].append(0)
+                    anno['alpha'].append(-np.arctan2(box[0], box[2]) + box[6])
+                    anno['bbox'].append(bbox)
+                    anno['dimensions'].append(box[3:6])
+                    anno['location'].append(box[:3])
+                    anno['rotation_y'].append(box[6])
+                    anno['score'].append(score)
+
+                anno = {k: np.stack(v) for k, v in anno.items()}
+                annos.append(anno)
+
+            else:
+                anno = {
+                    'name': np.array([]),
+                    'truncated': np.array([]),
+                    'occluded': np.array([]),
+                    'alpha': np.array([]),
+                    'bbox': np.zeros([0, 4]),
+                    'dimensions': np.zeros([0, 3]),
+                    'location': np.zeros([0, 3]),
+                    'rotation_y': np.array([]),
+                    'score': np.array([]),
+                }
+                annos.append(anno)
+
+            if submission_prefix is not None:
+                curr_file = f'{submission_prefix}/{sample_idx:06d}.txt'
+                with open(curr_file, 'w') as f:
+                    bbox = anno['bbox']
+                    loc = anno['location']
+                    dims = anno['dimensions']  # lhw -> hwl
+
+                    for idx in range(len(bbox)):
+                        print(
+                            '{} -1 -1 {:.4f} {:.4f} {:.4f} {:.4f} '
+                            '{:.4f} {:.4f} {:.4f} '
+                            '{:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}'.format(
+                                anno['name'][idx], anno['alpha'][idx],
+                                bbox[idx][0], bbox[idx][1], bbox[idx][2],
+                                bbox[idx][3], dims[idx][1], dims[idx][2],
+                                dims[idx][0], loc[idx][0], loc[idx][1],
+                                loc[idx][2], anno['rotation_y'][idx],
+                                anno['score'][idx]),
+                            file=f)
+
+            annos[-1]['sample_idx'] = np.array(
+                [sample_idx] * len(annos[-1]['score']), dtype=np.int64)
+
+            det_annos += annos
+
+        if pklfile_prefix is not None:
+            if not pklfile_prefix.endswith(('.pkl', '.pickle')):
+                out = f'{pklfile_prefix}.pkl'
+            mmcv.dump(det_annos, out)
+            print('Result is saved to %s' % out)
+
+        return det_annos
+    #
+    # def bbox2result_kitti(self,
+    #                       net_outputs,
+    #                       class_names,
+    #                       pklfile_prefix=None,
+    #                       submission_prefix=None):
+    #     """Convert 3D detection results to kitti format for evaluation and test
+    #     submission.
+    #
+    #     Args:
+    #         net_outputs (list[np.ndarray]): List of array storing the \
+    #             inferenced bounding boxes and scores.
+    #         class_names (list[String]): A list of class names.
+    #         pklfile_prefix (str | None): The prefix of pkl file.
+    #         submission_prefix (str | None): The prefix of submission file.
+    #
+    #     Returns:
+    #         list[dict]: A list of dictionaries with the kitti format.
+    #     """
+    #     assert len(net_outputs) == len(self.anno_infos + self.anno_infos_cam3)
+    #     if submission_prefix is not None:
+    #         mmcv.mkdir_or_exist(submission_prefix)
+    #
+    #     det_annos = []
+    #     print('\nConverting prediction to KITTI format')
+    #     for idx, pred_dicts in enumerate(
+    #             mmcv.track_iter_progress(net_outputs)):
+    #         annos = []
+    #         if idx % 2 == 0:
+    #             info = self.anno_infos[idx // 2]
+    #         else:
+    #             info = self.anno_infos_cam3[idx // 2]
+    #         sample_idx = info['image']['image_idx']
+    #         image_shape = info['image']['image_shape'][:2]
+    #
+    #         box_dict = self.convert_valid_bboxes(pred_dicts, info)
+    #         anno = {
+    #             'name': [],
+    #             'truncated': [],
+    #             'occluded': [],
+    #             'alpha': [],
+    #             'bbox': [],
+    #             'dimensions': [],
+    #             'location': [],
+    #             'rotation_y': [],
+    #             'score': []
+    #         }
+    #         if len(box_dict['bbox']) > 0:
+    #             box_2d_preds = box_dict['bbox']
+    #             box_preds = box_dict['box3d_camera']
+    #             scores = box_dict['scores']
+    #             box_preds_lidar = box_dict['box3d_lidar']
+    #             label_preds = box_dict['label_preds']
+    #
+    #             for box, box_lidar, bbox, score, label in zip(
+    #                     box_preds, box_preds_lidar, box_2d_preds, scores,
+    #                     label_preds):
+    #                 bbox[2:] = np.minimum(bbox[2:], image_shape[::-1])
+    #                 bbox[:2] = np.maximum(bbox[:2], [0, 0])
+    #                 anno['name'].append(class_names[int(label)])
+    #                 anno['truncated'].append(0.0)
+    #                 anno['occluded'].append(0)
+    #                 anno['alpha'].append(-np.arctan2(box[0], box[2]) + box[6])
+    #                 anno['bbox'].append(bbox)
+    #                 anno['dimensions'].append(box[3:6])
+    #                 anno['location'].append(box[:3])
+    #                 anno['rotation_y'].append(box[6])
+    #                 anno['score'].append(score)
+    #
+    #             anno = {k: np.stack(v) for k, v in anno.items()}
+    #             annos.append(anno)
+    #
+    #         else:
+    #             anno = {
+    #                 'name': np.array([]),
+    #                 'truncated': np.array([]),
+    #                 'occluded': np.array([]),
+    #                 'alpha': np.array([]),
+    #                 'bbox': np.zeros([0, 4]),
+    #                 'dimensions': np.zeros([0, 3]),
+    #                 'location': np.zeros([0, 3]),
+    #                 'rotation_y': np.array([]),
+    #                 'score': np.array([]),
+    #             }
+    #             annos.append(anno)
+    #
+    #         if submission_prefix is not None:
+    #             curr_file = f'{submission_prefix}/{sample_idx:06d}.txt'
+    #             with open(curr_file, 'w') as f:
+    #                 bbox = anno['bbox']
+    #                 loc = anno['location']
+    #                 dims = anno['dimensions']  # lhw -> hwl
+    #
+    #                 for idx in range(len(bbox)):
+    #                     print(
+    #                         '{} -1 -1 {:.4f} {:.4f} {:.4f} {:.4f} '
+    #                         '{:.4f} {:.4f} {:.4f} '
+    #                         '{:.4f} {:.4f} {:.4f} {:.4f} {:.4f} {:.4f}'.format(
+    #                             anno['name'][idx], anno['alpha'][idx],
+    #                             bbox[idx][0], bbox[idx][1], bbox[idx][2],
+    #                             bbox[idx][3], dims[idx][1], dims[idx][2],
+    #                             dims[idx][0], loc[idx][0], loc[idx][1],
+    #                             loc[idx][2], anno['rotation_y'][idx],
+    #                             anno['score'][idx]),
+    #                         file=f)
+    #
+    #         annos[-1]['sample_idx'] = np.array(
+    #             [sample_idx] * len(annos[-1]['score']), dtype=np.int64)
+    #
+    #         det_annos += annos
+    #
+    #     if pklfile_prefix is not None:
+    #         if not pklfile_prefix.endswith(('.pkl', '.pickle')):
+    #             out = f'{pklfile_prefix}.pkl'
+    #         mmcv.dump(det_annos, out)
+    #         print('Result is saved to %s' % out)
+    #
+    #     return det_annos
 
 

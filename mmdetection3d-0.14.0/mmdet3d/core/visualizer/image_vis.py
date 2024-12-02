@@ -270,7 +270,7 @@ def draw_camera_bbox3d_on_img(bboxes3d,
 
 def draw_keypoints_on_img(img,
                keypoints,
-               color=(61, 102, 0)):
+               ):
     colors = [(0,255,0), (255,0,0), (0,0,255), (0,255,255)]
     for kpts in keypoints:
         for i, k in enumerate(kpts.reshape(-1, 2)):

@@ -12,10 +12,11 @@ from tools.train import main as mm3d_train
 # Adding arguments dynamically
 # config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
 # config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_debug.py')
-config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo.py')
+config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_with_stereo_head.py')
 
+workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_training_bz_8_no_consistency_007')
+workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_training_bz_8_no_3d_pts_in_const_loss_0012')
 
-workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_training_bz_8_fixed_2d_bbox_and_flip_006')
 # workdir = os.path.abspath('../outputs/runs/debug_runs/lr_mom_comp_2_bz_8_stereo')
 
 sys.argv.extend([

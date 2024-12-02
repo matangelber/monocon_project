@@ -56,11 +56,13 @@ def gen_gaussian_target(heatmap, center, radius, k=1):
     masked_gaussian = gaussian_kernel[radius - top:radius + bottom,
                                       radius - left:radius + right]
     out_heatmap = heatmap
-    torch.max(
-        masked_heatmap,
-        masked_gaussian * k,
-        out=out_heatmap[y - top:y + bottom, x - left:x + right])
-
+    try:
+        torch.max(
+            masked_heatmap,
+            masked_gaussian * k,
+            out=out_heatmap[y - top:y + bottom, x - left:x + right])
+    except:
+        pass # don't add the gaussian to the heatmap
     return out_heatmap
 
 
