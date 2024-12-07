@@ -207,8 +207,11 @@ def main():
             ]:
                 eval_kwargs.pop(key, None)
             eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            print(dataset.evaluate(outputs, **eval_kwargs))
-
+            results = dataset.evaluate(outputs, **eval_kwargs)
+            print(results)
+            f = open(os.path.join('/'.join(args.out.split('/')[:-1]), "metrics_output.txt"))
+            f.write(results)
+            f.close()
 
 if __name__ == '__main__':
     main()

@@ -9,10 +9,19 @@ os.chdir(tools_path)
 from tools.test import main as mm3d_test
 
 # Adding arguments dynamically
-config_file = os.path.abspath('./configs/monocon/m')
+config_file = os.path.abspath('/home/matan/Projects/MonoCon/outputs/runs/stereo_runs/stereo_training_bz_8_fixed_2d_bbox_and_flip_006/monocon_dla34_200e_kitti_car_stereo.py')
+config_file = os.path.abspath('/home/matan/Projects/MonoCon/mmdetection3d-0.14.0/configs/monocon/monocon_dla34_inference_200e_kitti_car.py')
 checkpoint_path = os.path.abspath('../monocon/checkpoints/monocon4_200.pth')
-checkpoint_path = os.path.abspath('/outputs/runs/stereo_runs/stereo_training_bz_8_no_consistency_007/epoch_180.pth')
-workdir = os.path.abspath('../outputs/inference_runs/results_consistency_007/')
+checkpoint_path = os.path.abspath('/home/matan/Projects/MonoCon/outputs/runs/stereo_runs/stereo_training_bz_8_fixed_2d_bbox_and_flip_006/epoch_180.pth')
+workdir = os.path.abspath('../outputs/inference_runs/test_results_006/')
+
+# config_file = os.path.abspath('/home/matan/Projects/MonoCon/outputs/runs/stereo_runs/stereo_training_bz_8_fixed_2d_bbox_and_flip_006/monocon_dla34_200e_kitti_car_stereo.py')
+# checkpoint_path = os.path.abspath('/home/matan/Projects/MonoCon/outputs/runs/stereo_runs/stereo_heatmap_consist_loss_pretrained_0013/epoch_170.pth')
+# workdir = os.path.abspath('../outputs/inference_runs/test_results_0013/')
+#
+# config_file = os.path.abspath('/home/matan/Projects/MonoCon/outputs/runs/stereo_runs/stereo_training_bz_8_fixed_2d_bbox_and_flip_006/monocon_dla34_200e_kitti_car_stereo.py')
+# checkpoint_path = os.path.abspath('/home/matan/Projects/MonoCon/outputs/runs/stereo_runs/stereo_heatmap_consist_loss_factor_05_pretrained_0018/epoch_175.pth')
+# workdir = os.path.abspath('../outputs/inference_runs/test_results_0018/')
 if not os.path.exists(workdir):
     os.mkdir(workdir)
 # Construct the list of arguments you want to add to sys.argv

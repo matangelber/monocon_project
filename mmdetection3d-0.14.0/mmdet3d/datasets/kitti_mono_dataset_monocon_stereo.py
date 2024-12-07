@@ -449,6 +449,31 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='keypoints_stereo')
 
 
+
+    def show_stereo(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
+        """Results visualization.
+
+        Args:
+            results (list[dict]): List of bounding boxes results.
+            out_dir (str): Output directory of visualization result.
+            show (bool): Visualize the results online.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+        """
+        assert output_dir is not None, 'Expect out_dir, got none.'
+        pipeline = self._get_pipeline(pipeline)
+        for i in range(min(max_images_to_show, len(self.data_infos))):
+            data_info = self.data_infos[i]
+            img_path = data_info['file_name']
+            file_name = osp.split(img_path)[-1].split('.')[0]
+            img, cam_intrinsic = self._extract_data(i, pipeline,
+                                                ['img', 'cam_intrinsic'])
+            img_cam3, cam_intrinsic_cam3 = self._extract_data_cam3(i, pipeline,
+                                                    ['img', 'cam_intrinsic'])
+            concat_and_show_images(img, img_cam3, output_dir, file_name, show, suffix='keypoints_stereo')
+
+
+
     def show_pipline_transform(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
         """Results visualization.
 
