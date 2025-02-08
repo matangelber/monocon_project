@@ -8,7 +8,7 @@ from os import path as osp
 from mmdet3d.core.visualizer.image_vis import draw_camera_bbox3d_on_img
 from .kitti_mono_dataset import KittiMonoDataset
 from mmdet.datasets import DATASETS
-from ..core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, show_2d_gt, \
+from ..core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_bbox, show_2d_gt, \
     concat_and_show_images, draw_keypoints
 from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
 from .utils import extract_result_dict, get_loading_pipeline
@@ -63,7 +63,7 @@ def transform_bbox_cam2_to_cam3(bbox, P2, P3, depth):
     bbox_cam3 = bbox.copy()
     bbox_cam3[:, 0] += delta_x  # x_min_cam3 = x_min_cam2 + delta_x
     bbox_cam3[:, 2] += delta_x  # x_max_cam3 = x_max_cam2 + delta_x
-
+    bbox_cam3 = bbox_cam3.clip(min=0)
     return bbox_cam3
 
 
@@ -142,9 +142,19 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         anno_infos = deepcopy(self.anno_infos)
         for ann_info in anno_infos:
             ann_info['image']['image_path'] = ann_info['image']['image_path'].replace('image_2', 'image_3')
-            ann_info['annos']['bbox'] = transform_bbox_cam2_to_cam3(ann_info['annos']['bbox'],
+            if len(np.where(ann_info['annos']['bbox'][:, 0 ] == 0)[0]) > 0:
+                bad_indices = np.where(ann_info['annos']['bbox'][:, 0 ] == 0)[0]
+            new_bbox = transform_bbox_cam2_to_cam3(ann_info['annos']['bbox'],
                                                                     ann_info['calib']['P2'], ann_info['calib']['P3'],
                                                                      ann_info['annos']['location'][:, 2])
+
+            if len(np.where(new_bbox[:, 0] < 0 )[0]) > 0:
+                bad_indices = np.where(new_bbox[:, 0] < 0 )[0]
+            w1 = ann_info['annos']['bbox'][:, 2] - ann_info['annos']['bbox'][:, 0]
+            w2 = new_bbox[:, 2] - new_bbox[:, 0]
+            new_truncated =  (w2 / w1) * ann_info['annos']['truncated']
+            ann_info['annos']['bbox'] = new_bbox
+            ann_info['annos']['truncated'] = new_truncated
             ann_info['annos']['alpha'] = transform_alpha_cam2_to_cam3(ann_info['annos']['alpha'],
                                                                     ann_info['calib']['P2'], ann_info['calib']['P3'],
                                                                      ann_info['annos']['location'][:, 2])
@@ -333,7 +343,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             return data
 
 
-    def show(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
+    def show(self,  max_images_to_show=5, output_dir=None, show=True, pipeline=None):
         """Results visualization.
 
         Args:
@@ -360,7 +370,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             gt_bboxes_cam3 = self.get_ann_info_cam3(i)['gt_bboxes_3d']
             # TODO: remove the hack of box from NuScenesMonoDataset
             gt_bboxes_cam3 = mono_cam_box2vis(gt_bboxes_cam3)  # local yaw -> global yaw
-            show_img_left = show_3d_gt(
+            show_img_left = show_3d_bbox(
                 img,
                 gt_bboxes,
                 cam_intrinsic,
@@ -368,7 +378,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 file_name,
                 show=show,
                 suffix='left')
-            show_img_right = show_3d_gt(
+            show_img_right = show_3d_bbox(
                 img_cam3,
                 gt_bboxes_cam3,
                 cam_intrinsic_cam3,
@@ -377,8 +387,6 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 show=show,
                 suffix='right')
             concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='gt_stereo')
-
-
 
     def show_keypoints(self, max_images_to_show=5, output_dir=None, show=True, pipeline=None):
         """Results visualization.
@@ -412,7 +420,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             # TODO: remove the hack of box from NuScenesMonoDataset
             gt_bboxes_cam3 = mono_cam_box2vis(gt_bboxes_cam3)  # local yaw -> global yaw
             gt_kpts_2d_cam3 = anno_info_cam3['gt_kpts_2d']
-            show_img_left = show_3d_gt(
+            show_img_left = show_3d_bbox(
                 img=img,
                 gt_bboxes=gt_bboxes,
                 proj_mat=cam_intrinsic,
@@ -421,7 +429,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 img_metas=None,
                 show=False
             )
-            show_img_right = show_3d_gt(
+            show_img_right = show_3d_bbox(
                 img=img_cam3,
                 gt_bboxes=gt_bboxes_cam3,
                 proj_mat=cam_intrinsic_cam3,
@@ -519,7 +527,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                         show=False
                     )
 
-                    show_img_left = show_3d_gt(
+                    show_img_left = show_3d_bbox(
                         img=show_img_left,
                         gt_bboxes=mono_cam_box2vis(res['results_cam2']['gt_bboxes_3d']),
                         proj_mat=res['results_cam2']['cam_intrinsic'],
@@ -527,7 +535,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                         filename=file_name,
                         show=False
                     )
-                    show_img_right = show_3d_gt(
+                    show_img_right = show_3d_bbox(
                         img=show_img_right,
                         gt_bboxes=mono_cam_box2vis(res['results_cam3']['gt_bboxes_3d']),
                         proj_mat=res['results_cam3']['cam_intrinsic'],
@@ -609,6 +617,143 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         image = (255 * image / image.max()).astype(np.uint8)
         image =  np.ascontiguousarray(image)
         return image
+
+
+    def show_predictions(self, results,  max_images_to_show=5, output_dir=None, show=True, pipeline=None):
+        """Results visualization.
+
+        Args:
+            results (list[dict]): List of bounding boxes results.
+            out_dir (str): Output directory of visualization result.
+            show (bool): Visualize the results online.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+        """
+        assert output_dir is not None, 'Expect out_dir, got none.'
+        pipeline = self._get_pipeline(pipeline)
+        for i in range(min(max_images_to_show, len(self.data_infos))):
+            result_left = results[2*i]
+            result_right = results[2*i+1]
+            if 'img_bbox' in result_left.keys():
+                result_left = result_left['img_bbox']
+            if 'img_bbox' in result_right.keys():
+                result_right = result_right['img_bbox']
+            data_info = self.data_infos[i]
+            img_path = data_info['file_name']
+            file_name = osp.split(img_path)[-1].split('.')[0]
+            img, cam_intrinsic = self._extract_data(i, pipeline,
+                                                    ['img', 'cam_intrinsic'])
+            img_cam3, cam_intrinsic_cam3 = self._extract_data_cam3(i, pipeline,
+                                                                   ['img', 'cam_intrinsic'])
+            pred_bboxes_left = result_left['boxes_3d']
+            pred_bboxes_right = result_right['boxes_3d']
+            gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes = mono_cam_box2vis(gt_bboxes)  # local yaw -> global yaw
+            gt_bboxes_cam3 = self.get_ann_info_cam3(i)['gt_bboxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes_cam3 = mono_cam_box2vis(gt_bboxes_cam3)  # local yaw -> global yaw
+            show_img_left = show_3d_bbox(
+                img,
+                gt_bboxes,
+                cam_intrinsic,
+                show=show,
+                suffix='left',
+            bbox_type='gt')
+            show_img_right = show_3d_bbox(
+                img_cam3,
+                gt_bboxes_cam3,
+                cam_intrinsic_cam3,
+                show=show,
+                suffix='right',
+                bbox_type='gt')
+            show_img_left = show_3d_bbox(
+                show_img_left,
+                pred_bboxes_left,
+                cam_intrinsic,
+                output_dir,
+                file_name,
+                show=show,
+                suffix='left',
+                bbox_type='pred')
+            show_img_right = show_3d_bbox(
+                show_img_right,
+                pred_bboxes_right,
+                cam_intrinsic_cam3,
+                output_dir,
+                file_name,
+                show=show,
+                suffix='right',
+                bbox_type='pred')
+            concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='predictions_stereo')
+
+    def show_offset_predictions(self, results,  max_images_to_show=5, output_dir=None, show=True, pipeline=None):
+        """Results visualization.
+
+        Args:
+            results (list[dict]): List of bounding boxes results.
+            out_dir (str): Output directory of visualization result.
+            show (bool): Visualize the results online.
+            pipeline (list[dict], optional): raw data loading for showing.
+                Default: None.
+        """
+        assert output_dir is not None, 'Expect out_dir, got none.'
+        pipeline = self._get_pipeline(pipeline)
+        for i in range(min(max_images_to_show, len(self.data_infos))):
+            result_left = results[2*i]
+            result_right = results[2*i+1]
+            if 'img_bbox' in result_left.keys():
+                result_left = result_left['img_bbox']
+            if 'img_bbox' in result_right.keys():
+                result_right = result_right['img_bbox']
+            data_info = self.data_infos[i]
+            img_path = data_info['file_name']
+            file_name = osp.split(img_path)[-1].split('.')[0]
+            img, cam_intrinsic = self._extract_data(i, pipeline,
+                                                    ['img', 'cam_intrinsic'])
+            img_cam3, cam_intrinsic_cam3 = self._extract_data_cam3(i, pipeline,
+                                                                   ['img', 'cam_intrinsic'])
+            pred_bboxes_left = result_left['boxes_3d']
+            pred_bboxes_right = result_right['boxes_3d']
+            gt_bboxes = self.get_ann_info(i)['gt_bboxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes = mono_cam_box2vis(gt_bboxes)  # local yaw -> global yaw
+            gt_bboxes_cam3 = self.get_ann_info_cam3(i)['gt_bboxes_3d']
+            # TODO: remove the hack of box from NuScenesMonoDataset
+            gt_bboxes_cam3 = mono_cam_box2vis(gt_bboxes_cam3)  # local yaw -> global yaw
+            show_img_left = show_3d_bbox(
+                img,
+                gt_bboxes,
+                cam_intrinsic,
+                show=show,
+                suffix='left',
+            bbox_type='gt')
+            show_img_right = show_3d_bbox(
+                img_cam3,
+                gt_bboxes_cam3,
+                cam_intrinsic_cam3,
+                show=show,
+                suffix='right',
+                bbox_type='gt')
+            show_img_left = show_3d_bbox(
+                show_img_left,
+                pred_bboxes_left,
+                cam_intrinsic,
+                output_dir,
+                file_name,
+                show=show,
+                suffix='left',
+                bbox_type='pred')
+            show_img_right = show_3d_bbox(
+                show_img_right,
+                pred_bboxes_right,
+                cam_intrinsic_cam3,
+                output_dir,
+                file_name,
+                show=show,
+                suffix='right',
+                bbox_type='pred')
+            concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='predictions_stereo')
 
 
     def show_bev_stereo(self, results, out_dir, show=True, pipeline=None):

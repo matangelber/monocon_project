@@ -25,7 +25,8 @@ workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_heatmap_consist_lo
 workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_heatmap_consist_loss_factor_05_pretrained_0018')
 workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_heatmap_consist_loss_factor_01_pretrained_0019')
 workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_heatmap_consist_loss_factor_05_pretrained_with_corners_consistency_loss_0020')
-
+workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_heatmap_consist_loss_factor_05_pretrained_center_3d_0021')
+workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_heatmap_consist_loss_factor_05_pretrained_center_01_corners_0022')
 
 
 

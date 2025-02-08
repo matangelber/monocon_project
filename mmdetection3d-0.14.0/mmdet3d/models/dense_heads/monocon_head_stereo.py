@@ -275,16 +275,30 @@ class MonoConHeadStereo(nn.Module):
         #### FOR DEBUG: ###########################################################
         #### FOR DEBUG: ###########################################################
         #### FOR DEBUG: ###########################################################
-        from mmdet3d.core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_gt, concat_and_show_images, draw_keypoints
+        from mmdet3d.core import show_multi_modality_result, show_bev_multi_modality_result, show_3d_bbox, concat_and_show_images, draw_keypoints
         #
-        # def normalize_to_uint8(image):
-        #     image = image - image.min()
-        #     image = (255 * image / image.max()).astype(np.uint8)
-        #     image = np.ascontiguousarray(image)
-        #     return image
-        #
-        # def to_np(t):
-        #     return t.clone().detach().cpu().numpy()
+        def normalize_to_uint8(image):
+            image = image - image.min()
+            image = (255 * image / image.max()).astype(np.uint8)
+            image = np.ascontiguousarray(image)
+            return image
+
+        def to_np(t):
+            return t.clone().detach().cpu().numpy()
+
+        if img_metas[0]['filename'][-5:] == "10.png":
+            depth_pred_np = to_np(depth_pred)
+            concat_and_show_images(normalize_to_uint8(depth_pred_np[0][0]), normalize_to_uint8(depth_pred_np[1][0]),
+                                   out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                                   filename='depth_pred_0',
+                                   show=False, suffix="")
+
+        if img_metas[2]['filename'][-5:] == "10.png":
+            depth_pred_np = to_np(depth_pred)
+            concat_and_show_images(normalize_to_uint8(depth_pred_np[2][0]), normalize_to_uint8(depth_pred_np[3][0]),
+                                   out_dir="/home/matan/Projects/MonoCon/outputs/debug_loss",
+                                   filename='depth_pred_0',
+                                   show=False, suffix="")
         # a_wh = to_np(wh_target)
         # a_dim = to_np(dim_target)
         # a_offset = to_np(offset_target)
@@ -436,6 +450,7 @@ class MonoConHeadStereo(nn.Module):
         # loss_wh_stereo = self.loss_wh(wh_pred, wh_pred_stereo)
         loss_center_heatmap_consistency = self.loss_center_heatmap(center_heatmap_pred, center_consistency_heatmap)
         loss_corners_heatmap_consistency = self.loss_kpt_heatmap(kpt_heatmap_pred, corners_consistency_heatmap)
+        # loss_corners_heatmap_consistency = self.loss_kpt_heatmap(kpt_heatmap_pred[:,-1:,:,:], corners_consistency_heatmap[:,-1:,:,:])
 
 
         if self.dim_aware_in_loss:
@@ -454,7 +469,7 @@ class MonoConHeadStereo(nn.Module):
         loss_depth_consistency *= c
         # loss_3d_points_consistency *= c
         loss_center_heatmap_consistency *= c
-        loss_corners_heatmap_consistency *= c
+        loss_corners_heatmap_consistency *= 0.1
         return dict(
             loss_center_heatmap=loss_center_heatmap,
             loss_wh=loss_wh,
@@ -561,7 +576,7 @@ class MonoConHeadStereo(nn.Module):
             #     continue
             scores, ys, xs = kpts_local_maximas[k]
             pred_k_kpts = torch.cat([xs.unsqueeze(-1).float(), ys.unsqueeze(-1).float()], dim=-1)
-            gt_kpts_2d = [g.reshape(-1,9,2) for g in gt_kpts_2d]
+            gt_kpts_2d = [g.reshape(-1,self.num_kpt,2) for g in gt_kpts_2d]
             for batch_id in range(bs):
                 dest_id = batch_id + (-1) ** batch_id
                 gt_bbox = gt_bboxes[batch_id]
@@ -1252,7 +1267,6 @@ class MonoConHeadStereo(nn.Module):
         # print(len(closest_pred_centers_batch[0]), len(closest_pred_centers_batch[1]))
         # print(len(closest_pred_centers_batch[2]), len(closest_pred_centers_batch[3]))
         return closest_pred_centers_batch
-
 
 
     def recover_rotation(self, kpts, alpha, calib):

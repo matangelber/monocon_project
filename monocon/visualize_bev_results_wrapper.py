@@ -31,9 +31,13 @@ def visualize_results_wrapper(config_file, results, output_dir="", show=False, f
 
 
 if __name__ == '__main__':
-    config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
-    results = os.path.abspath('../outputs/inference_runs/pretrained_results/output.pkl')
-    output_dir = os.path.abspath('../outputs/debug_bev_outputs/')
+    # config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
+    # results = os.path.abspath('../outputs/inference_runs/pretrained_results/output.pkl')
+    # output_dir = os.path.abspath('../outputs/debug_bev_outputs/')
+    config_file = os.path.abspath(
+        './configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_with_stereo_head_pretrained.py')
+    results = os.path.abspath('../outputs/inference_runs/results_0013/output.pkl')
+    output_dir = os.path.abspath('../outputs/visualize_results/results_bev_0013/')
     show=False
     filtered_file_names = None # ['training/image_2/000063.png']
     visualize_results_wrapper(config_file, results, output_dir, show, filtered_file_names)

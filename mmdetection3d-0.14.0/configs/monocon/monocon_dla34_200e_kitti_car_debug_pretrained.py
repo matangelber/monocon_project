@@ -20,5 +20,5 @@ log_config = dict(
     hooks=[
         dict(type='TextLoggerHook'),
         dict(type='TensorboardLoggerHook'),
-        dict(type='MlflowLoggerHook')
+        # dict(type='MlflowLoggerHook')
     ])

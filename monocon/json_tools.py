@@ -46,10 +46,13 @@ if __name__ == '__main__':
     file_names = [
         'training\image_2000063.png'
     ]
-    for json_filename in ['kitti_infos_test_mono3d.coco.json',
-                          'kitti_infos_train_mono3d.coco.json',
-                          'kitti_infos_val_mono3d.coco.json',
-                          'kitti_infos_trainval_mono3d.coco.json']:
+    # for json_filename in ['kitti_infos_test_mono3d.coco.json',
+    #                       'kitti_infos_train_mono3d.coco.json',
+    #                       'kitti_infos_val_mono3d.coco.json',
+    #                       'kitti_infos_trainval_mono3d.coco.json']:
+    for json_filename in [
+                          'kitti_infos_train_mono3d.coco.json'
+    ]:
         input_file = os.path.join(input_dir, json_filename)
         output_file = os.path.join(output_dir, json_filename)
         filter_json(input_file, output_file, file_names=file_names, max_images=max_images)

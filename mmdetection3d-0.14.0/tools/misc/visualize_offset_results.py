@@ -38,9 +38,9 @@ def main(new_coco_json=None):
         # data loading pipeline for showing
         eval_pipeline = cfg.get('eval_pipeline', {})
         if eval_pipeline:
-            dataset.show_predictions(results, output_dir=args.output_dir, show=args.show, max_images_to_show=args.max_images, pipeline=eval_pipeline)
+            dataset.show_offset_predictions(results, output_dir=args.output_dir, show=args.show, max_images_to_show=args.max_images, pipeline=eval_pipeline)
         else:
-            dataset.show_predictions(results, output_dir=args.output_dir, show=args.show, max_images_to_show=args.max_images)  # use default pipeline
+            dataset.show_offset_predictions(results, output_dir=args.output_dir, show=args.show, max_images_to_show=args.max_images)  # use default pipeline
     else:
         raise NotImplementedError(
             'Show is not implemented for dataset {}!'.format(

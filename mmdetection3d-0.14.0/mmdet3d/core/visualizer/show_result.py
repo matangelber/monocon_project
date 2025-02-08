@@ -378,15 +378,15 @@ def show_bev_stereo_multi_modality_result(img,
         mmcv.imwrite(bev_image, osp.join(result_path, f'{filename}_bev_img.png'))
 
 
-def show_3d_gt(img,
+def show_3d_bbox(img,
                gt_bboxes,
                proj_mat,
-               out_dir,
-               filename,
+               out_dir=None,
+               filename=None,
                img_metas=None,
                show=False,
                suffix="",
-               gt_bbox_color=(61, 102, 255)):
+               bbox_type='gt'):
     """Convert multi-modality detection results into 2D results.
 
     Project the predicted 3D bbox to 2D image plane and visualize them.
@@ -408,16 +408,24 @@ def show_3d_gt(img,
         pred_bbox_color (str or tuple(int)): Color of bbox lines.
            The tuple of color should be in BGR order. Default: (72, 101, 241)
     """
+    if bbox_type == 'gt':
+        color = (61, 102, 255)
+    elif bbox_type == 'pred':
+        color =  (241, 101, 72)
     show_img = img.copy()
     if gt_bboxes is not None:
         show_img = draw_camera_bbox3d_on_img(
-            gt_bboxes, show_img, proj_mat, img_metas, color=gt_bbox_color)
+            gt_bboxes, show_img, proj_mat, img_metas, color=color)
     if show:
         mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
     if out_dir:
         result_path = osp.join(out_dir, filename)
         mmcv.mkdir_or_exist(result_path)
-        mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_{suffix}.png'))
+        if bbox_type == 'gt':
+            mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_{suffix}.png'))
+        elif bbox_type == 'pred':
+            mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_pred_{suffix}.png'))
+
     return show_img
 
 def show_2d_gt(img,
