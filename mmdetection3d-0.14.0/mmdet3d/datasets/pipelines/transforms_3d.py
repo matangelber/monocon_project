@@ -1491,87 +1491,6 @@ class RandomShiftMonoCon:
             'gt_bboxes_ignore': 'gt_labels_ignore'
         }
 
-    def apply_shift(self, results, random_shift_x, random_shift_y):
-        img_shape = results['img'].shape[:2]
-        new_x = max(0, random_shift_x)
-        orig_x = max(0, -random_shift_x)
-        new_y = max(0, random_shift_y)
-        orig_y = max(0, -random_shift_y)
-
-        for key in results.get('bbox_fields', []):
-            bboxes = results[key].copy()
-            bboxes[..., 0::2] += random_shift_x
-            bboxes[..., 1::2] += random_shift_y
-
-            # clip border
-            bboxes[..., 0::2] = np.clip(bboxes[..., 0::2], 0, img_shape[1])
-            bboxes[..., 1::2] = np.clip(bboxes[..., 1::2], 0, img_shape[0])
-
-            # remove invalid bboxes
-            bbox_w = bboxes[..., 2] - bboxes[..., 0]
-            bbox_h = bboxes[..., 3] - bboxes[..., 1]
-            valid_inds = (bbox_w > self.filter_thr_px) & (
-                    bbox_h > self.filter_thr_px)
-            # If the shift does not contain any gt-bbox area, skip this
-            # image.
-            if key == 'gt_bboxes' and not valid_inds.any():
-                return results
-            bboxes = bboxes[valid_inds]
-            results[key] = bboxes
-
-            # label fields. e.g. gt_labels and gt_labels_ignore
-            label_key = self.bbox2label.get(key)
-            if label_key in results:
-                results[label_key] = results[label_key][valid_inds]
-
-            if key == 'gt_bboxes':
-                cam = np.array(results['cam_intrinsic'])
-                cam[0, 2] += random_shift_x
-                cam[1, 2] += random_shift_y
-                results['cam_intrinsic'] = cam
-
-                if 'gt_labels_3d' in results:
-                    results['gt_labels_3d'] = results['gt_labels_3d'][valid_inds]
-
-                if 'gt_bboxes_3d' in results:
-                    box_3d_tensor = results['gt_bboxes_3d'].tensor
-                    assert box_3d_tensor.shape[-1] == 7
-                    box_3d_tensor = box_3d_tensor[valid_inds]
-                    box_3d_tensor = CameraInstance3DBoxes(box_3d_tensor)
-                    results['gt_bboxes_3d'] = box_3d_tensor
-
-                if 'centers2d' in results:
-                    centers2d = results['centers2d'].copy()
-
-                    centers2d[..., 0] += random_shift_x
-                    centers2d[..., 1] += random_shift_y
-
-                    centers2d = centers2d[valid_inds]
-                    results['centers2d'] = centers2d
-
-                if 'depths' in results:
-                    results['depths'] = results['depths'][valid_inds]
-
-                if 'gt_kpts_2d' in results:
-                    gt_kpts_2d = results['gt_kpts_2d'].copy()
-                    gt_kpts_2d[..., 0::2] += random_shift_x
-                    gt_kpts_2d[..., 1::2] += random_shift_y
-
-                    gt_kpts_2d = gt_kpts_2d[valid_inds]
-                    results['gt_kpts_2d'] = gt_kpts_2d
-                    results['gt_kpts_valid_mask'] = results['gt_kpts_valid_mask'][valid_inds]
-
-        for key in results.get('img_fields', ['img']):
-            img = results[key]
-            new_img = np.zeros_like(img)
-            img_h, img_w = img.shape[:2]
-            new_h = img_h - np.abs(random_shift_y)
-            new_w = img_w - np.abs(random_shift_x)
-            new_img[new_y:new_y + new_h, new_x:new_x + new_w] \
-                = img[orig_y:orig_y + new_h, orig_x:orig_x + new_w]
-            results[key] = new_img
-        return results
-
     def __call__(self, results):
         """Call function to random shift images, bounding boxes.
 
@@ -1582,11 +1501,90 @@ class RandomShiftMonoCon:
             dict: Shift results.
         """
         if random.random() < self.shift_ratio:
+            img_shape = results['img'].shape[:2]
+
             random_shift_x = random.randint(-self.max_shift_px,
                                             self.max_shift_px)
             random_shift_y = random.randint(-self.max_shift_px,
                                             self.max_shift_px)
-            results = self.apply_shift(results, random_shift_x, random_shift_y)
+            new_x = max(0, random_shift_x)
+            orig_x = max(0, -random_shift_x)
+            new_y = max(0, random_shift_y)
+            orig_y = max(0, -random_shift_y)
+
+            for key in results.get('bbox_fields', []):
+                bboxes = results[key].copy()
+                bboxes[..., 0::2] += random_shift_x
+                bboxes[..., 1::2] += random_shift_y
+
+                # clip border
+                bboxes[..., 0::2] = np.clip(bboxes[..., 0::2], 0, img_shape[1])
+                bboxes[..., 1::2] = np.clip(bboxes[..., 1::2], 0, img_shape[0])
+
+                # remove invalid bboxes
+                bbox_w = bboxes[..., 2] - bboxes[..., 0]
+                bbox_h = bboxes[..., 3] - bboxes[..., 1]
+                valid_inds = (bbox_w > self.filter_thr_px) & (
+                    bbox_h > self.filter_thr_px)
+                # If the shift does not contain any gt-bbox area, skip this
+                # image.
+                if key == 'gt_bboxes' and not valid_inds.any():
+                    return results
+                bboxes = bboxes[valid_inds]
+                results[key] = bboxes
+
+                # label fields. e.g. gt_labels and gt_labels_ignore
+                label_key = self.bbox2label.get(key)
+                if label_key in results:
+                    results[label_key] = results[label_key][valid_inds]
+
+                if key == 'gt_bboxes':
+                    cam = np.array(results['cam_intrinsic'])
+                    cam[0, 2] += random_shift_x
+                    cam[1, 2] += random_shift_y
+                    results['cam_intrinsic'] = cam
+
+                    if 'gt_labels_3d' in results:
+                        results['gt_labels_3d'] = results['gt_labels_3d'][valid_inds]
+
+                    if 'gt_bboxes_3d' in results:
+                        box_3d_tensor = results['gt_bboxes_3d'].tensor
+                        assert box_3d_tensor.shape[-1] == 7
+                        box_3d_tensor = box_3d_tensor[valid_inds]
+                        box_3d_tensor = CameraInstance3DBoxes(box_3d_tensor)
+                        results['gt_bboxes_3d'] = box_3d_tensor
+
+                    if 'centers2d' in results:
+                        centers2d = results['centers2d'].copy()
+
+                        centers2d[..., 0] += random_shift_x
+                        centers2d[..., 1] += random_shift_y
+
+                        centers2d = centers2d[valid_inds]
+                        results['centers2d'] = centers2d
+
+                    if 'depths' in results:
+                        results['depths'] = results['depths'][valid_inds]
+
+                    if 'gt_kpts_2d' in results:
+                        gt_kpts_2d = results['gt_kpts_2d'].copy()
+                        gt_kpts_2d[..., 0::2] += random_shift_x
+                        gt_kpts_2d[..., 1::2] += random_shift_y
+
+                        gt_kpts_2d = gt_kpts_2d[valid_inds]
+                        results['gt_kpts_2d'] = gt_kpts_2d
+                        results['gt_kpts_valid_mask'] = results['gt_kpts_valid_mask'][valid_inds]
+
+            for key in results.get('img_fields', ['img']):
+                img = results[key]
+                new_img = np.zeros_like(img)
+                img_h, img_w = img.shape[:2]
+                new_h = img_h - np.abs(random_shift_y)
+                new_w = img_w - np.abs(random_shift_x)
+                new_img[new_y:new_y + new_h, new_x:new_x + new_w] \
+                    = img[orig_y:orig_y + new_h, orig_x:orig_x + new_w]
+                results[key] = new_img
+
         return results
 
     def __repr__(self):

@@ -1,5 +1,7 @@
 import collections
-
+from mmdet3d.core import show_3d_bbox
+import glob
+import os
 from mmcv.utils import build_from_cfg
 from copy import deepcopy
 from ..builder import PIPELINES
@@ -35,8 +37,38 @@ class Compose(object):
         Returns:
            dict: Transformed data.
         """
+        if 'img_info' in data.keys():
+            img_name = data['img_info']['file_name'].split('.')[0].split('/')[-1]
+        else:
+            img_name = data['results_cam2']['img_info']['file_name'].split('.')[0].split('/')[-1]
+        if img_name == '000003':
+            out_dir = '/home/matan/Projects/MonoCon/outputs/consistency_outputs/000003'
+            img_dir_name = os.path.join(out_dir, f"img_")
+            images_transforms = glob.glob(os.path.join(out_dir, img_dir_name) + '*')
+            if len(images_transforms) == 0:
+                img_dir_name = f"img_0"
+            else:
+                numbers = [int(s.split("_")[-1]) for s in images_transforms]
+                new_num = max(numbers) + 1
+                img_dir_name = f"img_{str(new_num)}"
+            out_dir = os.path.join(out_dir, img_dir_name)
 
-        for t in self.transforms:
+        for i, t in enumerate(self.transforms):
+            if img_name == '000003':
+                if 'results_cam2' in data.keys():
+                    img_data = data['results_cam2']
+                    if 'gt_bboxes_3d' in img_data.keys():
+                        t_name = f"t_{str(i)}"+str(t.__class__).split("'")[-2].split(".")[-1]
+                        if "Collect" not in t_name:
+                            show_3d_bbox(img_data['img'],
+                                         img_data['gt_bboxes_3d'],
+                                         img_data['cam_intrinsic'],
+                                         out_dir=out_dir,
+                                         filename=t_name,
+                                         img_metas=None,
+                                         show=False,
+                                         suffix="",
+                                         bbox_type='gt')
             data = t(data)
             if data is None:
                 return None

@@ -376,7 +376,7 @@ def export_2d_annotation(root_path, info_path, mono3d=True):
     mmcv.dump(coco_2d_dict, f'{json_prefix}.coco.json')
 
 
-def get_2d_boxes(info, occluded, mono3d=True, proj_matrix='P2'):
+def get_2d_boxes(info, occluded, mono3d=True):
     """Get the 2D annotation records for a given info.
 
     Args:
@@ -391,7 +391,7 @@ def get_2d_boxes(info, occluded, mono3d=True, proj_matrix='P2'):
             `sample_data_token`.
     """
     # Get calibration information
-    P = info['calib'][proj_matrix]
+    P2 = info['calib']['P2']
 
     repro_recs = []
     # if no annotations in info (test dataset), then return
@@ -426,8 +426,8 @@ def get_2d_boxes(info, occluded, mono3d=True, proj_matrix='P2'):
         dst = np.array([0.5, 0.5, 0.5])
         src = np.array([0.5, 1.0, 0.5])
         loc = loc + dim * (dst - src)
-        offset = (info['calib'][proj_matrix][0, 3] - info['calib']['P0'][0, 3]) \
-            / info['calib'][proj_matrix][0, 0]
+        offset = (info['calib']['P2'][0, 3] - info['calib']['P0'][0, 3]) \
+            / info['calib']['P2'][0, 0]
         loc_3d = np.copy(loc)
         loc_3d[0, 0] += offset
         gt_bbox_3d = np.concatenate([loc, dim, rot], axis=1).astype(np.float32)
@@ -450,7 +450,7 @@ def get_2d_boxes(info, occluded, mono3d=True, proj_matrix='P2'):
         valid_corners_mask[in_front, :] = 1
 
         # Project 3d box to 2d.
-        camera_intrinsic = P
+        camera_intrinsic = P2
         corner_coords = view_points(corners_3d, camera_intrinsic,
                                     True).T[:, :2].tolist()
         all_corner_coords = view_points(all_corners_3d, camera_intrinsic, True).T[:, :2]

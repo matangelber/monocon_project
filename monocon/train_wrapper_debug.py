@@ -12,6 +12,8 @@ from tools.train import main as mm3d_train
 # Adding arguments dynamically
 # config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
 config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_debug_pretrained.py')
+# config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_debug_pipeline_visualization.py')
+
 # config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo.py')
 
 

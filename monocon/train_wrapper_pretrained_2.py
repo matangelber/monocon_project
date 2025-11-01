@@ -13,7 +13,7 @@ from tools.train import main as mm3d_train
 # config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
 # config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_debug.py')
 # config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_with_stereo_head.py')
-config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_with_stereo_head_pretrained.py')
+config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_with_stereo_head.py')
 
 
 workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_training_bz_8_no_consistency_007')
@@ -32,6 +32,8 @@ workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_heatmap_projected_
 workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_only_corners_loss_pretrained_0026')
 workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_only_corners_loss_pretrained_0027_FIX_ANNOS')
 workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_only_corners_loss_pretrained_0028_no_consistency')
+workdir = os.path.abspath('../outputs/runs/stereo_runs/stereo_only_corners_loss_pretrained_0029_no_consistency_no_pretrained')
+
 
 
 

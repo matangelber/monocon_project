@@ -1,5 +1,6 @@
 import sys
 import os
+import mmcv
 from json_tools import filter_json
 # Save the original sys.path
 original_sys_path = sys.path.copy()
@@ -41,7 +42,23 @@ if __name__ == '__main__':
     results = os.path.abspath('../outputs/inference_runs/run_0013_6_8_2025/output.pkl')
     output_dir = os.path.abspath('../outputs/visualize_results/results_bev_0013_6_8_2025/')
 
-    show=False
-    filtered_file_names = None # ['training/image_2/000063.png']
-    visualize_results_wrapper(config_file, results, output_dir, show, filtered_file_names)
+    results = mmcv.load(results)
+    gt  =
+    left_images_results = results[::2]
+    right_images_results = results[1::2]
+
+    for Left_im_results, right_im_results in zip(left_images_results, right_images_results):
+        left_bboxes_3d = Left_im_results['img_bbox']
+        right_bboxes_3d = right_im_results['img_bbox']
+        left_pred_num = left_bboxes_3d['boxes_3d'].tensor.size(0)
+        right_pred_num = right_bboxes_3d['boxes_3d'].tensor.size(0)
+        if left_pred_num != right_pred_num:
+            print(f'{left_pred_num} != {right_pred_num}')
+        print("left predictions_size: ", left_bboxes_3d['boxes_3d'].tensor.size())
+        print("right predictions_size: ", right_bboxes_3d['boxes_3d'].tensor.size())
+
+    print("Done")
+    # show=False
+    # filtered_file_names = None # ['training/image_2/000063.png']
+    # visualize_results_wrapper(config_file, results, output_dir, show, filtered_file_names)
 

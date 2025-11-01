@@ -131,12 +131,12 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
 
         img_id = self.data_infos_cam3[idx]['id']
         ann_ids = self.coco.get_ann_ids(img_ids=[img_id])
-        ann_info = self.coco.load_anns(ann_ids)
-        for ann in ann_info:
+        ann_info_cam3 = deepcopy(self.coco.load_anns(ann_ids))
+        for ann in ann_info_cam3:
             cam2_keys_to_change = [k[:-5] for k in list(ann.keys()) if k.endswith('cam3')]
             for k in cam2_keys_to_change:
                 ann[k] = ann[k + '_cam3']
-        return self._parse_ann_info(self.data_infos_cam3[idx], ann_info)
+        return self._parse_ann_info(self.data_infos_cam3[idx], ann_info_cam3)
 
     def _get_anno_infos_cam3(self):
         anno_infos = deepcopy(self.anno_infos)
@@ -152,7 +152,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 bad_indices = np.where(new_bbox[:, 0] < 0 )[0]
             w1 = ann_info['annos']['bbox'][:, 2] - ann_info['annos']['bbox'][:, 0]
             w2 = new_bbox[:, 2] - new_bbox[:, 0]
-            new_truncated =  (w2 / w1) * ann_info['annos']['truncated']
+            new_truncated =  1 - (w2 / w1) * (1 - ann_info['annos']['truncated'])
             ann_info['annos']['bbox'] = new_bbox
             ann_info['annos']['truncated'] = new_truncated
             ann_info['annos']['alpha'] = transform_alpha_cam2_to_cam3(ann_info['annos']['alpha'],
@@ -168,6 +168,8 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
             data_info_cam3 = deepcopy(data_info)
             data_info_cam3['cam_intrinsic'] = cam_intrinsic_cam3_map[data_info_cam3['filename'].split('/')[-1]]
             data_info_cam3['filename'] = data_info_cam3['filename'].replace('image_2', 'image_3')
+            print(data_info['filename'])
+            print(data_info_cam3['filename'])
             data_info_cam3['file_name'] = data_info_cam3['filename']
             data_infos_cam3.append(data_info_cam3)
         return data_infos_cam3
@@ -674,7 +676,7 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 output_dir,
                 file_name,
                 show=show,
-                suffix='left',
+                suffix='left_FULL_PROJ',
                 bbox_type='pred')
             show_img_right = show_3d_bbox(
                 show_img_right,
@@ -683,9 +685,9 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
                 output_dir,
                 file_name,
                 show=show,
-                suffix='right',
+                suffix='right_FULL_PROJ_2',
                 bbox_type='pred')
-            concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='predictions_stereo')
+            concat_and_show_images(show_img_left, show_img_right, output_dir, file_name, show, suffix='predictions_stereo_FULL_PROJ_3')
 
     def show_offset_predictions(self, results,  max_images_to_show=5, output_dir=None, show=True, pipeline=None):
         """Results visualization.
@@ -885,16 +887,25 @@ class KittiMonoDatasetMonoConStereo(KittiMonoDataset):
         Returns:
             list[dict]: A list of dictionaries with the kitti format.
         """
-        assert len(net_outputs) == len(self.anno_infos)
+        # assert len(net_outputs) == len(self.anno_infos)
         if submission_prefix is not None:
             mmcv.mkdir_or_exist(submission_prefix)
 
         det_annos = []
         print('\nConverting prediction to KITTI format')
+        if hasattr(self, 'anno_infos_cam3'):
+            anno_infos = []
+            for i in range(len(self.anno_infos)):
+                anno_infos += [self.anno_infos[i]] + [self.anno_infos_cam3[i]]
+        else:
+            anno_infos = copy.deepcopy(self.anno_infos)
+        assert len(net_outputs) == len(anno_infos)
+
+
         for idx, pred_dicts in enumerate(
                 mmcv.track_iter_progress(net_outputs)):
             annos = []
-            info = self.anno_infos[idx]
+            info = anno_infos[idx]
             sample_idx = info['image']['image_idx']
             image_shape = info['image']['image_shape'][:2]
 

@@ -410,21 +410,27 @@ def show_3d_bbox(img,
     """
     if bbox_type == 'gt':
         color = (61, 102, 255)
+        suffix = 'gt_' + suffix
+        # proj_mat = np.array(proj_mat)
+        # proj_mat[3:, 3:] = 0
     elif bbox_type == 'pred':
         color =  (241, 101, 72)
+        suffix = 'pred_' + suffix
     show_img = img.copy()
     if gt_bboxes is not None:
         show_img = draw_camera_bbox3d_on_img(
-            gt_bboxes, show_img, proj_mat, img_metas, color=color)
+            gt_bboxes, show_img, proj_mat, img_metas,bbox_type=bbox_type, color=color)
     if show:
         mmcv.imshow(show_img, win_name=f'{filename} - project_bbox3d_img', wait_time=0)
     if out_dir:
-        result_path = osp.join(out_dir, filename)
+        # result_path = osp.join(out_dir, filename)
+        result_path = out_dir
         mmcv.mkdir_or_exist(result_path)
-        if bbox_type == 'gt':
-            mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_{suffix}.png'))
-        elif bbox_type == 'pred':
-            mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_pred_{suffix}.png'))
+        mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_{suffix}.png'))
+        # if bbox_type == 'gt':
+        #     mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_gt_{suffix}.png'))
+        # elif bbox_type == 'pred':
+        #     mmcv.imwrite(show_img, osp.join(result_path, f'{filename}_pred_{suffix}.png'))
 
     return show_img
 

@@ -25,7 +25,6 @@ from .waymo_dataset import WaymoDataset
 from .kitti_mono_dataset_monocon import KittiMonoDatasetMonoCon
 from .kitti_mono_dataset_monocon_stereo import KittiMonoDatasetMonoConStereo
 
-
 __all__ = [
     'KittiDataset', 'KittiMonoDataset', 'GroupSampler',
     'DistributedGroupSampler', 'build_dataloader', 'RepeatFactorDataset',
@@ -38,6 +37,5 @@ __all__ = [
     'ScanNetSegDataset', 'SemanticKITTIDataset', 'Custom3DDataset',
     'Custom3DSegDataset', 'LoadPointsFromMultiSweeps', 'WaymoDataset',
     'BackgroundPointsFilter', 'VoxelBasedPointSampler', 'get_loading_pipeline',
-    'RandomDropPointsColor', 'RandomJitterPoints', 'ObjectNameFilter', 'KittiMonoDatasetMonoCon',
-    'KittiMonoDatasetMonoConStereo'
+    'RandomDropPointsColor', 'RandomJitterPoints', 'ObjectNameFilter', 'KittiMonoDatasetMonoCon', 'KittiMonoDatasetMonoConStereo '
 ]

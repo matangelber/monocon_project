@@ -12,7 +12,7 @@ from mmdet3d.core import bbox3d2result, box3d_multiclass_nms, xywhr2xyxyr
 from mmdet.datasets import DATASETS, CocoDataset
 from ..core import show_multi_modality_result, show_bev_multi_modality_result
 from ..core.bbox import CameraInstance3DBoxes, get_box_type, mono_cam_box2vis
-from .pipelines import Compose, ComposeForVisualization
+from mmdet.datasets.pipelines.compose import Compose, ComposeForVisualization
 from .utils import extract_result_dict, get_loading_pipeline
 
 

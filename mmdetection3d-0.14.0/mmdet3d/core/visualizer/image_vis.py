@@ -227,11 +227,21 @@ def convert_bbox_corners_to_img(bboxes3d,
         num_bbox = 0
     return imgfov_pts_2d
 
+def points_cam2img_full_proj(points_3d, cam_intrinsic):
+    points_num = list(points_3d.shape)[:-1]
+    points_shape = np.concatenate([points_num, [1]], axis=0).tolist()
+    points_4 = torch.cat(
+        [points_3d, points_3d.new_ones(*points_shape)], dim=-1)
+    point_2d = torch.matmul(points_4, cam_intrinsic.t())
+    point_2d_res = point_2d[..., :2] / point_2d[..., 2:3]
+    return point_2d_res
+
 
 def draw_camera_bbox3d_on_img(bboxes3d,
                               raw_img,
                               cam_intrinsic,
                               img_metas,
+                              bbox_type='gt',
                               color=(0, 255, 0),
                               thickness=1):
     """Project the 3D bbox on 2D plane and draw on input image.
@@ -251,15 +261,17 @@ def draw_camera_bbox3d_on_img(bboxes3d,
     cam_intrinsic = copy.deepcopy(cam_intrinsic)
     if not isinstance(cam_intrinsic, torch.Tensor):
         cam_intrinsic = torch.from_numpy(np.array(cam_intrinsic))
-    cam_intrinsic = cam_intrinsic[:3,:3].float().cpu()
-    # cam_intrinsic = cam_intrinsic.reshape(3, 3).float().cpu()
+    # cam_intrinsic = cam_intrinsic[:3,:3].float().cpu()
 
     if len(bboxes3d) > 0:
         corners_3d = bboxes3d.corners
         num_bbox = corners_3d.shape[0]
         points_3d = corners_3d.reshape(-1, 3)
         # project to 2d to get image coords (uv)
-        uv_origin = points_cam2img(points_3d, cam_intrinsic)
+        if bbox_type == 'gt':
+            uv_origin = points_cam2img(points_3d, cam_intrinsic[:3,:3].float().cpu())
+        else:
+            uv_origin = points_cam2img_full_proj(points_3d, cam_intrinsic.float().cpu())
         uv_origin = (uv_origin - 1).round()
         imgfov_pts_2d = uv_origin[..., :2].reshape(num_bbox, 8, 2).numpy()
     else:

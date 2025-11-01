@@ -33,9 +33,13 @@ if __name__ == '__main__':
     # config_file = os.path.abspath('./configs/monocon/monocon_dla34_200e_kitti_car_debug.py')
     # results = os.path.abspath('../outputs/inference_runs/pretrained_results/output.pkl')
     # output_dir = os.path.abspath('../outputs/debug_outputs/')
-    config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_with_stereo_head_pretrained.py')
-    results = os.path.abspath('../outputs/inference_runs/run_0013/output.pkl')
-    output_dir = os.path.abspath('../outputs/visualize_results/run_0013/')
+    # config_file = os.path.abspath('./configs/monocon/stereo_configs/monocon_dla34_200e_kitti_car_stereo_with_stereo_head_pretrained.py')
+    # results = os.path.abspath('../outputs/inference_runs/run_0013_6_8_2025/output.pkl')
+    # output_dir = os.path.abspath('../outputs/visualize_results/run_0013_6_8_2025/')
+
+    config_file = "/home/matan/Projects/DA3D/configs/test_configs/TableVI_line2.py"
+    results = "/home/matan/Projects/DA3D/work_dirs/validation_results/results.pkl"
+    output_dir = "/home/matan/Projects/DA3D/work_dirs/validation_results/visualize_results"
     show=False
     filtered_file_names = None #['training/image_2/000063.png']
     visualize_results_wrapper(config_file, results, output_dir, show, filtered_file_names)

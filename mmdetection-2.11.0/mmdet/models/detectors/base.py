@@ -177,6 +177,8 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
         should be double nested (i.e.  List[Tensor], List[List[dict]]), with
         the outer list indicating test time augmentations.
         """
+        # for i, img_meta in enumerate(img_metas):
+        #     img_meta['img'] = img[i]
         if return_loss:
             return self.forward_train(img, img_metas, **kwargs)
         else:
@@ -244,6 +246,21 @@ class BaseDetector(nn.Module, metaclass=ABCMeta):
                 DDP, it means the batch size on each GPU), which is used for \
                 averaging the logs.
         """
+        img_name = data['img_metas'][0]['filename'].split('.')[0].split('/')[-1]
+        if img_name == '000003':
+            from  mmdet3d.core import show_3d_bbox
+            img = data['img'][0].clone().detach().cpu().numpy().transpose(1,2,0)
+            img -= img.min()
+            img /= img.max()
+            show_3d_bbox(255 *img,
+                         data['gt_bboxes_3d'][0],
+                         data['img_metas'][0]['cam_intrinsic'],
+                         out_dir='/home/matan/Projects/MonoCon/outputs/consistency_outputs/000003',
+                         filename=f"after_pipeline_{data['batch_step']}",
+                         img_metas=None,
+                         show=False,
+                         suffix="",
+                         bbox_type='gt')
         losses = self(**data)
         loss, log_vars = self._parse_losses(losses)
 

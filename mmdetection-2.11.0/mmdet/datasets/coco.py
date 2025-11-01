@@ -80,6 +80,11 @@ class CocoDataset(CustomDataset):
         img_id = self.data_infos[idx]['id']
         ann_ids = self.coco.get_ann_ids(img_ids=[img_id])
         ann_info = self.coco.load_anns(ann_ids)
+        # print("ann_info[0]['file_name']", ann_info[0]['file_name'])
+        # if ann_info[0]['file_name'] == 'training/image_2/000003.png':
+        #     print("img_id:", img_id)
+        #     print("ann_ids:", ann_ids)
+        #     print("ann_info:", ann_info)
         return self._parse_ann_info(self.data_infos[idx], ann_info)
 
     def get_cat_ids(self, idx):
